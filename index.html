@@ -75,6 +75,10 @@
         <strong>Please use a local server</strong> (see README.md) for best results.
     </div>
 
+    <!-- Legend chrome: edge strip (open) + backdrop (close) — dedicated hit targets, not canvas -->
+    <div id="legend-edge-open" class="legend-edge-open" aria-hidden="true" title="Swipe left to open legend"></div>
+    <div id="legend-backdrop" class="legend-backdrop" aria-hidden="true"></div>
+
     <div class="container">
         <div class="header">
             <h1 class="title-font title">APPLYKO</h1>
@@ -159,10 +163,11 @@
                         </div>
                     </div>
                     <div class="legend-item legend-touch-only">
-                        <div class="legend-key">Tap</div>
+                        <div class="legend-key">Swipe</div>
                         <div class="legend-text">
-                            <strong>Legend</strong><br>
-                            Use the <strong>Legend</strong> button (header) — or <strong>L</strong> on a keyboard
+                            <strong>Legend open / close</strong><br>
+                            Swipe <strong>left</strong> on the purple right edge to open<br>
+                            Swipe <strong>right</strong> on the panel (or dimmed area) to close · tap dimmed area also closes
                         </div>
                     </div>
                 </div>

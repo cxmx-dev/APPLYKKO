@@ -15,9 +15,12 @@ async function bootstrap() {
 
     await initGame();
 
-    // Legend: slide in from right (L key, header Legend button, swipe optional)
+    // Legend: L key, header button, right-edge swipe open, panel/backdrop swipe right close
     const legendPanel = document.getElementById('legend-panel');
     const legendBtn = document.getElementById('btn-legend');
+    const legendEdge = document.getElementById('legend-edge-open');
+    const legendBackdrop = document.getElementById('legend-backdrop');
+
     if (legendPanel) {
         const setLegendOpen = (open) => {
             legendPanel.classList.toggle('is-open', open);
@@ -26,19 +29,108 @@ async function bootstrap() {
                 legendBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
                 legendBtn.classList.toggle('is-active', open);
             }
+            if (legendBackdrop) {
+                legendBackdrop.classList.toggle('is-open', open);
+                legendBackdrop.setAttribute('aria-hidden', open ? 'false' : 'true');
+            }
+            // Edge strip only while closed (so it doesn't sit under the open panel)
+            if (legendEdge) {
+                legendEdge.classList.toggle('is-hidden', open);
+                legendEdge.setAttribute('aria-hidden', open ? 'true' : 'false');
+            }
         };
 
         setLegendOpen(false);
 
+        /**
+         * Simple horizontal swipe on a dedicated element (pointer capture).
+         * Does not fight canvas aim because edge/backdrop/panel own the pointers.
+         */
+        function bindHSwipe(el, { onLeft, onRight, minDx = 28 }) {
+            if (!el) return;
+            let x0 = 0;
+            let y0 = 0;
+            let t0 = 0;
+            let pid = null;
+
+            el.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                pid = e.pointerId;
+                x0 = e.clientX;
+                y0 = e.clientY;
+                t0 = performance.now();
+                try {
+                    el.setPointerCapture(e.pointerId);
+                } catch (err) { /* ignore */ }
+            });
+
+            const end = (e) => {
+                if (pid != null && e.pointerId !== pid) return;
+                const dx = e.clientX - x0;
+                const dy = e.clientY - y0;
+                const dt = performance.now() - t0;
+                pid = null;
+                if (dt > 900) return;
+                if (Math.abs(dx) < minDx) return;
+                // Mostly horizontal (loose)
+                if (Math.abs(dx) < Math.abs(dy) * 0.65) return;
+                if (dx < 0 && onLeft) onLeft(e);
+                if (dx > 0 && onRight) onRight(e);
+            };
+
+            el.addEventListener('pointerup', end);
+            el.addEventListener('pointercancel', () => { pid = null; });
+            // Lost capture still ends swipe
+            el.addEventListener('lostpointercapture', (e) => {
+                if (pid != null) end(e);
+            });
+        }
+
+        // OPEN: swipe left on right-edge strip (wide, always hittable)
+        bindHSwipe(legendEdge, {
+            minDx: 24,
+            onLeft: () => setLegendOpen(true)
+        });
+        // Also tap/click the edge strip = open (fallback if swipe feels weird)
+        if (legendEdge) {
+            legendEdge.addEventListener('click', (e) => {
+                e.preventDefault();
+                setLegendOpen(true);
+            });
+        }
+
+        // CLOSE: swipe right on panel or backdrop; tap backdrop
+        bindHSwipe(legendPanel, {
+            minDx: 32,
+            onRight: () => setLegendOpen(false)
+        });
+        bindHSwipe(legendBackdrop, {
+            minDx: 24,
+            onRight: () => setLegendOpen(false),
+            onLeft: () => { /* ignore */ }
+        });
+        if (legendBackdrop) {
+            legendBackdrop.addEventListener('click', (e) => {
+                e.preventDefault();
+                setLegendOpen(false);
+            });
+        }
+
         window.addEventListener('keydown', (e) => {
             if (e.key !== 'l' && e.key !== 'L') return;
-            // Don't steal L while typing in bet field or other form controls
             const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
             if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) {
                 return;
             }
             e.preventDefault();
             setLegendOpen(!legendPanel.classList.contains('is-open'));
+        });
+
+        // Esc closes
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && legendPanel.classList.contains('is-open')) {
+                setLegendOpen(false);
+            }
         });
 
         if (legendBtn) {
@@ -48,39 +140,11 @@ async function bootstrap() {
             });
         }
 
-        // Click the [L] chip to close when open
         const hint = legendPanel.querySelector('.key-hint');
         if (hint) {
             hint.style.cursor = 'pointer';
             hint.addEventListener('click', () => setLegendOpen(false));
         }
-
-        // Touch: fast swipe right→left opens legend (same idea as Pinball)
-        let swipeX0 = 0;
-        let swipeT0 = 0;
-        document.addEventListener('touchstart', (e) => {
-            if (!e.touches || !e.touches[0]) return;
-            if (e.target && e.target.closest && (
-                e.target.closest('#legend-panel') ||
-                e.target.closest('button') ||
-                e.target.closest('input') ||
-                e.target.closest('select') ||
-                e.target.closest('canvas')
-            )) {
-                swipeX0 = 0;
-                return;
-            }
-            swipeX0 = e.touches[0].clientX;
-            swipeT0 = performance.now();
-        }, { passive: true });
-        document.addEventListener('touchend', (e) => {
-            if (!swipeX0 || !e.changedTouches || !e.changedTouches[0]) return;
-            const dx = e.changedTouches[0].clientX - swipeX0;
-            const dt = performance.now() - swipeT0;
-            swipeX0 = 0;
-            // Fast right-to-left swipe
-            if (dt < 450 && dx < -70) setLegendOpen(true);
-        }, { passive: true });
 
         window.APPLYKO = window.APPLYKO || {};
         window.APPLYKO.toggleLegend = () => setLegendOpen(!legendPanel.classList.contains('is-open'));

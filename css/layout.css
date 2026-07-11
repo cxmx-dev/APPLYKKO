@@ -17,6 +17,9 @@
     height: 100dvh;
     max-height: 100dvh;
     overflow: hidden;
+    /* Keep horizontal flicks for legend; reduce browser back-swipe steal on Android */
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
 }
 
 .header {

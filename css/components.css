@@ -177,14 +177,55 @@ body.applyko-ready .game-canvas {
     max-height: 100%;
 }
 
+/* Right-edge open strip (invisible) — reliable swipe-left target, not fighting canvas aim */
+.legend-edge-open {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 35;
+    width: max(40px, env(safe-area-inset-right, 0px) + 36px);
+    height: 100%;
+    height: 100dvh;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    /* soft hint on phone only */
+    background: transparent;
+}
+html.device-phone .legend-edge-open,
+html.device-tablet .legend-edge-open,
+html.input-touch .legend-edge-open {
+    background: linear-gradient(270deg, rgba(168, 85, 247, 0.14) 0%, transparent 70%);
+}
+.legend-edge-open.is-hidden {
+    pointer-events: none;
+    visibility: hidden;
+}
+
+/* Dim screen while legend open — tap or swipe right to close */
+.legend-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: rgba(2, 4, 12, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.legend-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 /* Wider legend drawer on phone (full-ish side panel) */
 html.device-phone .legend-panel {
     width: min(320px, 88vw);
 }
 
-/* Legend docks to the right of the canvas stage and slides in/out */
+/* Legend: fixed so it sits above backdrop; swipe right on panel closes */
 .legend-panel {
-    position: absolute;
+    position: fixed;
     top: 0;
     right: 0;
     bottom: 0;
@@ -194,7 +235,7 @@ html.device-phone .legend-panel {
     border-left: 1px solid rgba(168, 85, 247, 0.35);
     padding: 14px 14px 18px;
     box-sizing: border-box;
-    z-index: 40;
+    z-index: 50;
     font-family: 'Inter', system-ui, sans-serif;
     color: #e4e4e7;
     overflow-y: auto;
@@ -204,6 +245,9 @@ html.device-phone .legend-panel {
     transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
     pointer-events: none;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    padding-top: max(14px, env(safe-area-inset-top));
+    padding-bottom: max(18px, env(safe-area-inset-bottom));
 }
 
 .legend-panel.is-open {

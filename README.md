@@ -16,7 +16,10 @@ Phone, tablet, and desktop via `device.js`:
 
 - Board CSS-fits the viewport; physics stays 1720×1450.
 - **Mobile perf:** locked lower GPU buffer (phone **0.45**); full paint rate; lighter VFX/trails; default 3 balls; pegs snapped (no strobe).
-- Touch aim (Pointer Events); larger control targets; **Legend** button + **L** + swipe ←.
+- Touch aim (Pointer Events); larger control targets; **Legend** button + **L**.
+- Mobile legend (dedicated hit zones — not fighting board aim):
+  - **Open:** swipe **left** on the **right-edge strip** (or tap strip / **Legend**)
+  - **Close:** swipe **right** on panel or **dim backdrop** (or tap backdrop)
 - Safe-area / `100dvh` where supported.
 
 ## How to run
@@ -47,7 +50,7 @@ First deploy (once): `.\scripts\push-pages.ps1 -Repo APPLYKKO`
 | Balls | Slider 1–5 (3–4 smoothest) |
 | Physics | Earth / Moon / Jupiter / Zero-G |
 | Endless | **ENDLESS** toggle |
-| Legend | **Legend** button or **L** |
+| Legend | **Legend** · **L** · mobile: edge swipe **←** open · panel/backdrop swipe **→** or tap dim to close |
 
 Bottom slots pay left→right: **8× · 5× · 2.5× · 1.4× · 0.7× · 0.3× · 0.7× · 1.4× · 2.5× · 5× · 8×**
 
@@ -56,6 +59,10 @@ More detail: `NOTES.md`. Machine paths: `USER-NOTES.md` (local only).
 ---
 
 ## Version History
+
+**71126 5:39:23:15 AM CST**
+
+- **`update .mds`:** mobile legend gestures rebuilt — right-edge strip + pointer capture for open; backdrop + panel swipe-right/tap for close (document-level swipes were unreliable over canvas aim).
 
 **71126 5:31:12:66 AM CST**
 
