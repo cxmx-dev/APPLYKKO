@@ -64,10 +64,10 @@ body.applyko-ready .game-canvas {
 canvas,
 button,
 input,
-.header,
+.status-bar,
+.control-dock,
 .balance,
-.bet-controls,
-.action-row {
+.bet-controls {
     -webkit-user-select: none !important;
     user-select: none !important;
     -webkit-touch-callout: none;

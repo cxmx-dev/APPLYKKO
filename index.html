@@ -80,62 +80,19 @@
     <div id="legend-backdrop" class="legend-backdrop" aria-hidden="true"></div>
 
     <div class="container">
-        <div class="header">
+        <!-- Slim top status only — full board below -->
+        <div class="status-bar">
             <h1 class="title-font title">APPLYKO</h1>
-            <div class="header-actions">
-                <button type="button" id="btn-legend" class="legend-open-btn" aria-label="Open legend">Legend</button>
-                <div class="balance">
-                    <div class="balance-label">BALANCE</div>
-                    <div id="balance" class="balance-value">$1,000</div>
-                </div>
+            <div class="balance">
+                <div class="balance-label">BALANCE</div>
+                <div id="balance" class="balance-value">$1,000</div>
             </div>
-        </div>
-
-        <!-- Controls -->
-        <div class="bet-controls">
-            <label for="bet-input" class="sr-only">Bet amount</label>
-            <input id="bet-input" type="number" value="25" aria-label="Bet amount" title="Bet amount" placeholder="Bet">
-            <button data-bet="10" class="quick-bet">10</button>
-            <button data-bet="25" class="quick-bet">25</button>
-            <button data-bet="50" class="quick-bet">50</button>
-            <button data-bet="100" class="quick-bet">100</button>
-            <button data-bet="250" class="quick-bet">250</button>
-            <button data-bet="500" class="quick-bet">MAX</button>
-        </div>
-
-        <div class="action-row">
-            <button id="drop-btn" class="drop-btn">DROP BALLS</button>
-            <button id="auto-btn" class="auto-btn">AUTO</button>
-            
-            <!-- Multi-ball control -->
-            <div class="multi-ball-control">
-                <label for="ball-count">Balls (3–4 best)</label>
-                <input type="range" id="ball-count" min="1" max="5" step="1" value="4" aria-label="Number of balls to drop">
-                <span id="ball-count-value">4</span>
-            </div>
-
-            <!-- Physics Preset -->
-            <div class="physics-preset">
-                <label for="physics-preset" class="sr-only">Physics preset</label>
-                <select id="physics-preset" aria-label="Physics preset">
-                    <option value="Earth">Earth</option>
-                    <option value="Moon">Moon</option>
-                    <option value="Jupiter">Jupiter</option>
-                    <option value="Zero-G">Zero-G</option>
-                </select>
-            </div>
-
-            <!-- Endless Mode Toggle -->
-            <button id="endless-toggle" class="endless-toggle" title="Toggle Endless / Progressive Mode">
-                <span class="label">ENDLESS</span>
-                <span id="endless-status" class="status">OFF</span>
-            </button>
         </div>
 
         <div class="canvas-stage">
             <canvas id="canvas" width="1720" height="1450" class="game-canvas"></canvas>
 
-            <!-- Legend: slides from right edge of canvas stage; toggle with L -->
+            <!-- Legend panel is position:fixed; markup kept near stage for DOM order -->
             <aside id="legend-panel" class="legend-panel" aria-hidden="true" aria-label="Game legend and controls">
                 <div class="legend-header">
                     <span>LEGEND</span>
@@ -173,7 +130,7 @@
                 </div>
 
                 <div class="legend-section">
-                    <div class="legend-title">TOP BAR — BETTING</div>
+                    <div class="legend-title">BOTTOM DOCK — BETTING</div>
                     <div class="legend-item">
                         <div class="legend-key">#</div>
                         <div class="legend-text">
@@ -198,11 +155,11 @@
                 </div>
 
                 <div class="legend-section">
-                    <div class="legend-title">ACTION ROW</div>
+                    <div class="legend-title">BOTTOM DOCK — PLAY</div>
                     <div class="legend-item">
                         <div class="legend-key">Drop</div>
                         <div class="legend-text">
-                            <strong>DROP BALLS</strong><br>
+                            <strong>DROP</strong> (bottom-right)<br>
                             Spends bet × ball count and releases balls
                         </div>
                     </div>
@@ -306,10 +263,55 @@
 
                 <div class="legend-note">
                     Bottom slots pay left→right: <strong>8× · 5× · 2.5× · 1.4× · 0.7× · 0.3× · 0.7× · 1.4× · 2.5× · 5× · 8×</strong>
-                    (edges high, center low). Balance is top-right.
+                    (edges high, center low). Balance is top-right. Controls dock bottom-right for right-hand use.
                 </div>
             </aside>
         </div>
+
+        <!-- Bottom control dock — primary actions right-aligned (right-hand thumb zone) -->
+        <footer class="control-dock" aria-label="Game controls">
+            <div class="dock-row dock-main">
+                <div class="dock-cluster dock-bet bet-controls">
+                    <label for="bet-input" class="sr-only">Bet amount</label>
+                    <input id="bet-input" type="number" value="25" aria-label="Bet amount" title="Bet amount" placeholder="Bet" inputmode="numeric">
+                    <button type="button" data-bet="10" class="quick-bet">10</button>
+                    <button type="button" data-bet="25" class="quick-bet">25</button>
+                    <button type="button" data-bet="50" class="quick-bet">50</button>
+                    <button type="button" data-bet="100" class="quick-bet">100</button>
+                    <button type="button" data-bet="250" class="quick-bet">250</button>
+                    <button type="button" data-bet="500" class="quick-bet">MAX</button>
+                </div>
+                <div class="dock-cluster dock-play">
+                    <button type="button" id="auto-btn" class="auto-btn">AUTO</button>
+                    <button type="button" id="drop-btn" class="drop-btn">DROP</button>
+                </div>
+            </div>
+            <div class="dock-row dock-settings">
+                <div class="dock-cluster dock-tune">
+                    <div class="multi-ball-control">
+                        <label for="ball-count">Balls</label>
+                        <input type="range" id="ball-count" min="1" max="5" step="1" value="4" aria-label="Number of balls to drop">
+                        <span id="ball-count-value">4</span>
+                    </div>
+                    <div class="physics-preset">
+                        <label for="physics-preset" class="sr-only">Physics preset</label>
+                        <select id="physics-preset" aria-label="Physics preset">
+                            <option value="Earth">Earth</option>
+                            <option value="Moon">Moon</option>
+                            <option value="Jupiter">Jupiter</option>
+                            <option value="Zero-G">Zero-G</option>
+                        </select>
+                    </div>
+                    <button type="button" id="endless-toggle" class="endless-toggle" title="Toggle Endless / Progressive Mode">
+                        <span class="label">ENDLESS</span>
+                        <span id="endless-status" class="status">OFF</span>
+                    </button>
+                </div>
+                <div class="dock-cluster dock-meta">
+                    <button type="button" id="btn-legend" class="legend-open-btn" aria-label="Open legend">Legend</button>
+                </div>
+            </div>
+        </footer>
     </div>
 
     <!-- 

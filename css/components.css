@@ -14,109 +14,7 @@ button {
     color: #fff;
 }
 
-.quick-bet {
-    padding: 1px 3px;
-    background: #27272a;
-    font-weight: 700;
-    border-radius: 9999px;
-    font-size: 0.62rem;
-}
-
-/* The button directly after the input joins the pill shape */
-.bet-controls button:first-of-type {
-    border-radius: 0 9999px 9999px 0;
-}
-
-.drop-btn {
-    flex: 1;
-    background: var(--accent);
-    color: white;
-    font-size: 0.62rem;
-    font-weight: 700;
-    padding: 2px 4px;
-    border-radius: 9999px;
-}
-
-.auto-btn {
-    padding: 2px 4px;
-    background: #27272a;
-    color: white;
-    font-size: 0.58rem;
-    font-weight: 600;
-    border-radius: 9999px;
-}
-
-.multi-ball-control {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: #1f1f23;
-    padding: 2px 8px;
-    border-radius: 9999px;
-    font-size: 0.7rem;
-}
-
-.multi-ball-control label {
-    color: #a1a1aa;
-}
-
-.multi-ball-control input[type="range"] {
-    width: 70px;
-}
-
-#ball-count-value {
-    min-width: 18px;
-    text-align: center;
-    font-weight: 700;
-}
-
-.physics-preset select {
-    background: #1f1f23;
-    color: #ddd;
-    border: 1px solid #3f3f46;
-    border-radius: 6px;
-    padding: 2px 6px;
-    font-size: 0.7rem;
-}
-
-.endless-toggle {
-    background: #1f1f23;
-    border: 1px solid #3f3f46;
-    color: #ddd;
-    padding: 4px 10px;
-    border-radius: 9999px;
-    font-size: 0.68rem;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.endless-toggle:hover {
-    background: #27272a;
-    border-color: #52525b;
-}
-
-.endless-toggle.active {
-    background: #166534;
-    border-color: #4ade80;
-    color: #86efac;
-}
-
-.endless-toggle .status {
-    font-weight: 700;
-    padding: 1px 6px;
-    border-radius: 9999px;
-    background: #27272a;
-    font-size: 0.6rem;
-}
-
-.endless-toggle.active .status {
-    background: #15803d;
-    color: #86efac;
-}
-
+/* Dock control chrome lives in layout.css — canvas styles below */
 .game-canvas {
     display: block;
     margin: 0 auto;
@@ -141,11 +39,6 @@ body.applyko-ready .game-canvas {
         0 0 55px rgba(168, 85, 247, 0.28),
         0 0 120px rgba(96, 165, 250, 0.08),
         0 30px 70px -15px rgb(0 0 0 / 0.7);
-}
-
-.drop-btn:hover {
-    box-shadow: 0 0 18px rgba(168, 85, 247, 0.55);
-    filter: brightness(1.08);
 }
 
 /* Legacy win animation (kept for compatibility) */

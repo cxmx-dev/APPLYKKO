@@ -41,15 +41,18 @@ First Pages deploy (once): `.\scripts\push-pages.ps1 -Repo APPLYKKO`
 
 ## Controls (short)
 
+Bottom **control dock** on all platforms (primary actions **right** for right-hand thumbs). Slim top bar = title + balance only.
+
 | Action | How |
 |--------|-----|
 | Aim | Drag left/right on board |
-| Drop | **DROP BALLS** |
-| Auto | **AUTO** / STOP |
+| Drop | **DROP** (bottom-right, primary) |
+| Auto | **AUTO** / STOP (left of Drop) |
+| Bet | Amount + quick chips (dock left) |
 | Balls | Slider 1–5 (3–4 smoothest) |
 | Physics | Earth / Moon / Jupiter / Zero-G |
 | Endless | **ENDLESS** toggle |
-| Legend | **Legend** · **L** · mobile: edge swipe **←** open · panel/backdrop swipe **→** or tap dim to close |
+| Legend | **Legend** · **L** · mobile: edge swipe **←** open · panel/backdrop swipe **→** or tap dim |
 
 Bottom slots pay left→right: **8× · 5× · 2.5× · 1.4× · 0.7× · 0.3× · 0.7× · 1.4× · 2.5× · 5× · 8×**
 
@@ -58,6 +61,10 @@ More detail: `NOTES.md`. Machine paths: `USER-NOTES.md` (local only).
 ---
 
 ## Version History
+
+**71126 5:47:52:72 AM CST**
+
+- **`update .mds`:** public README OPSEC scrub (no hub folder name in publish set); privacy scan clean path. Live deploy via hub `start.ps1 -Repo APPLYKKO`.
 
 **71126 5:39:23:15 AM CST**
 
