@@ -29,16 +29,15 @@ Phone, tablet, and desktop via `device.js`:
 npx --yes serve .
 ```
 
-Hub (after first Pages deploy):
+Hub deploy (portfolio helper scripts, after first Pages setup):
 
 ```powershell
-# from GitHub-Repo-Helper root
 .\scripts\start.ps1 -Repo APPLYKKO
-# or all Repos:
+# or all portfolio projects:
 .\scripts\start-all.ps1
 ```
 
-First deploy (once): `.\scripts\push-pages.ps1 -Repo APPLYKKO`
+First Pages deploy (once): `.\scripts\push-pages.ps1 -Repo APPLYKKO`
 
 ## Controls (short)
 
