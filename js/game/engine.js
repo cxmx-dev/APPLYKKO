@@ -18,45 +18,46 @@ let animationFrame = null;
 /** Backing-store scale (physics still WIDTH×HEIGHT via setTransform) */
 let renderScale = 1;
 let lowPerf = false;
-let frameSkip = 0;
+/** Buffer scale locked after first apply — avoid thrash when mobile chrome resizes */
+let bufferLocked = false;
+let lastCssW = 0;
+let lastCssH = 0;
 
 let dropBtn = null;
 let autoBtn = null;
 
 /**
- * Phone/tablet: draw into a smaller buffer (biggest Android win).
- * Physics/coordinates stay at WIDTH×HEIGHT via ctx.setTransform.
+ * Fixed steps only (no live shortSide math). Changing canvas.width mid-play
+ * clears the buffer every time — that looked like pegs strobing on Android.
  */
 function pickRenderScale() {
     const dp = window.DeviceProfile && window.DeviceProfile.get
         ? window.DeviceProfile.get()
         : null;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const shortSide = Math.min(window.innerWidth || 400, window.innerHeight || 700);
 
-    if (dp && dp.isPhone) {
-        // ~0.38–0.48 of full board pixels
-        return Math.max(0.36, Math.min(0.5, (shortSide * dpr) / WIDTH * 1.15));
-    }
-    if (dp && (dp.isTablet || (dp.isTouch && dp.narrow))) {
-        return 0.58;
-    }
-    if (dp && dp.isTouch) {
-        return 0.72;
-    }
-    // Desktop: full res unless tiny window
-    if (shortSide < 700) return 0.75;
+    if (dp && dp.isPhone) return 0.45;
+    if (dp && (dp.isTablet || (dp.isTouch && dp.narrow))) return 0.6;
+    if (dp && dp.isTouch) return 0.75;
+    const shortSide = Math.min(window.innerWidth || 900, window.innerHeight || 900);
+    if (shortSide < 700) return 0.8;
     return 1;
 }
 
 function applyRenderBuffer(force) {
     if (!canvas || !gameCtx) return;
+    // Only set buffer once unless force (orientation / device class change)
+    if (bufferLocked && !force) {
+        // setTransform can reset when context is lost; re-assert cheaply
+        gameCtx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+        return;
+    }
+
     const next = pickRenderScale();
     const nextLow = next < 0.72;
-    if (!force && Math.abs(next - renderScale) < 0.02 && nextLow === lowPerf) return;
-
     renderScale = next;
     lowPerf = nextLow;
+    bufferLocked = true;
+
     window.APPLYKO_PERF = {
         low: lowPerf,
         renderScale,
@@ -66,7 +67,8 @@ function applyRenderBuffer(force) {
         trailLen: lowPerf ? 2 : 5,
         skipHalos: lowPerf,
         skipBurstRotate: lowPerf,
-        windArrows: lowPerf ? 3 : 6
+        windArrows: lowPerf ? 3 : 6,
+        snapPegs: lowPerf
     };
 
     const bw = Math.max(320, Math.floor(WIDTH * renderScale));
@@ -77,17 +79,19 @@ function applyRenderBuffer(force) {
     }
     gameCtx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     gameCtx.imageSmoothingEnabled = true;
-    gameCtx.imageSmoothingQuality = lowPerf ? 'low' : 'medium';
+    // 'medium' on mobile avoids shimmer/strobe from low-quality resample of peg sprites
+    gameCtx.imageSmoothingQuality = lowPerf ? 'medium' : 'medium';
     initRenderer(gameCtx);
 }
 
 /**
- * Fit the board into the canvas-stage; also pick mobile render buffer scale.
+ * CSS-fit the board into the stage. Buffer scale is locked (see applyRenderBuffer).
  */
-function maximizeCanvasSize() {
+function maximizeCanvasSize(forceBuffer) {
     if (!canvas) return;
 
-    applyRenderBuffer(false);
+    if (forceBuffer) bufferLocked = false;
+    applyRenderBuffer(!!forceBuffer);
 
     const stage = canvas.closest('.canvas-stage') || canvas.parentElement;
     let maxW = window.innerWidth;
@@ -101,22 +105,16 @@ function maximizeCanvasSize() {
     maxW = Math.max(80, maxW - 4);
     maxH = Math.max(80, maxH - 4);
 
-    // CSS size from logical board aspect (not buffer pixels)
-    if (window.DeviceProfile && typeof window.DeviceProfile.fitCanvas === 'function') {
-        window.DeviceProfile.fitCanvas(canvas, {
-            width: WIDTH,
-            height: HEIGHT,
-            maxW,
-            maxH,
-            pad: 0,
-            allowUpscale: true
-        });
-        return;
-    }
-
+    // Only touch style when CSS size changes by >2px (URL bar show/hide)
     const scale = Math.min(maxW / WIDTH, maxH / HEIGHT);
-    canvas.style.width = Math.floor(WIDTH * scale) + 'px';
-    canvas.style.height = Math.floor(HEIGHT * scale) + 'px';
+    const cssW = Math.floor(WIDTH * scale);
+    const cssH = Math.floor(HEIGHT * scale);
+    if (Math.abs(cssW - lastCssW) > 2 || Math.abs(cssH - lastCssH) > 2) {
+        lastCssW = cssW;
+        lastCssH = cssH;
+        canvas.style.width = cssW + 'px';
+        canvas.style.height = cssH + 'px';
+    }
 }
 
 /**
@@ -327,15 +325,7 @@ function gameLoop() {
         updateBalanceUI(state.balance);
     }
 
-    // Mobile: skip every other paint (physics still every frame)
-    if (lowPerf) {
-        frameSkip ^= 1;
-        if (frameSkip) {
-            animationFrame = requestAnimationFrame(gameLoop);
-            return;
-        }
-    }
-
+    // Always paint (frame-skip caused pegs to strobe on some Android GPUs)
     draw(state);
 
     animationFrame = requestAnimationFrame(gameLoop);
@@ -343,14 +333,18 @@ function gameLoop() {
 
 export async function initGame() {
     canvas = document.getElementById('canvas');
-    // desynchronized + opaque path: less compositor work on large boards
-    gameCtx = canvas.getContext('2d', { alpha: false, desynchronized: true })
+    // Opaque 2d. Avoid desynchronized on mobile — it can tear/strobe on Android.
+    const wantSync = !(window.DeviceProfile && window.DeviceProfile.get && window.DeviceProfile.get().isTouch);
+    gameCtx = (wantSync
+        ? canvas.getContext('2d', { alpha: false, desynchronized: true })
+        : null)
         || canvas.getContext('2d', { alpha: false })
         || canvas.getContext('2d');
 
-    // Mobile buffer scale BEFORE first paint (Android: avoid full 1720×1450 every frame)
+    // Mobile buffer scale BEFORE first paint (fixed step; locked after this)
+    bufferLocked = false;
     applyRenderBuffer(true);
-    maximizeCanvasSize();
+    maximizeCanvasSize(false);
 
     // Imagine dazzle pack (board, sprites, win VFX) — non-blocking fallback if missing
     document.body?.classList.add('applyko-loading');
@@ -397,17 +391,25 @@ export async function initGame() {
     if (animationFrame) cancelAnimationFrame(animationFrame);
     gameLoop();
 
-    window.addEventListener('resize', maximizeCanvasSize);
+    // CSS fit only on resize — do NOT rebuild buffer (that flashed all pegs)
+    let resizeT = 0;
+    const onResizeCss = () => {
+        clearTimeout(resizeT);
+        resizeT = setTimeout(() => maximizeCanvasSize(false), 120);
+    };
+    window.addEventListener('resize', onResizeCss);
     window.addEventListener('orientationchange', () => {
-        setTimeout(maximizeCanvasSize, 80);
-        setTimeout(maximizeCanvasSize, 280);
+        // Orientation: allow new buffer scale once
+        setTimeout(() => maximizeCanvasSize(true), 100);
+        setTimeout(() => maximizeCanvasSize(false), 350);
     });
-    document.addEventListener('fullscreenchange', maximizeCanvasSize);
+    document.addEventListener('fullscreenchange', onResizeCss);
     if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', maximizeCanvasSize);
+        // URL bar show/hide — CSS only, never buffer reset
+        window.visualViewport.addEventListener('resize', onResizeCss);
     }
     if (window.DeviceProfile && typeof window.DeviceProfile.onChange === 'function') {
-        window.DeviceProfile.onChange(() => maximizeCanvasSize());
+        window.DeviceProfile.onChange(() => maximizeCanvasSize(true));
     }
 
     // Aiming: pointer events (mouse + touch + pen)

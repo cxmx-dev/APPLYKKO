@@ -174,6 +174,7 @@ export function draw(state) {
     }
 
     // Pegs — no shadowBlur (major GPU cost on 1720×1450)
+    const snapPegs = !!perf().snapPegs;
     for (const peg of pegs) {
         let color = '#e4e4e7';
         let size = PEG_RADIUS;
@@ -201,46 +202,51 @@ export function draw(state) {
         }
 
         const sprite = pegSpriteForType(peg.type);
+        // Integer positions on mobile reduce subpixel shimmer/strobe
+        const px = snapPegs ? Math.round(peg.x) : peg.x;
+        const py = snapPegs ? Math.round(peg.y) : peg.y;
+        if (snapPegs) spriteSize = Math.round(spriteSize);
 
-        // Cheap activated pulse: soft disc under peg (no shadowBlur)
+        // Activated hit flash only (no per-frame alpha flicker on idle pegs)
         if (glow) {
             ctx.globalAlpha = 0.35;
             ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.arc(peg.x, peg.y, size + 6, 0, Math.PI * 2);
+            ctx.arc(px, py, size + 6, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1;
         }
 
-        const drew = drawSpriteCentered(sprite, peg.x, peg.y, spriteSize, glow ? 1 : 0.95);
+        // Always alpha 1 — 0.95 idle alpha + low-res scale was shimmering on Android
+        const drew = drawSpriteCentered(sprite, px, py, spriteSize, 1);
         if (!drew) {
             ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.arc(peg.x, peg.y, size, 0, Math.PI * 2);
+            ctx.arc(px, py, size, 0, Math.PI * 2);
             ctx.fill();
 
             if (drawExtra) {
                 ctx.fillStyle = '#fff';
                 if (drawExtra === 'magnet') {
-                    ctx.fillRect(peg.x - 1.5, peg.y - 7, 3, 14);
-                    ctx.fillRect(peg.x - 4, peg.y - 4, 8, 3);
+                    ctx.fillRect(px - 1.5, py - 7, 3, 14);
+                    ctx.fillRect(px - 4, py - 4, 8, 3);
                 }
                 if (drawExtra === 'splitter') {
-                    ctx.fillRect(peg.x - 4, peg.y - 1, 8, 2);
-                    ctx.fillRect(peg.x - 1, peg.y - 4, 2, 8);
+                    ctx.fillRect(px - 4, py - 1, 8, 2);
+                    ctx.fillRect(px - 1, py - 4, 2, 8);
                 }
                 if (drawExtra === 'multiplier') {
                     ctx.beginPath();
-                    ctx.moveTo(peg.x, peg.y - 5);
-                    ctx.lineTo(peg.x + 1.5, peg.y - 1.5);
-                    ctx.lineTo(peg.x + 5, peg.y - 1.5);
-                    ctx.lineTo(peg.x + 2, peg.y + 1);
-                    ctx.lineTo(peg.x + 3, peg.y + 5);
-                    ctx.lineTo(peg.x, peg.y + 2.5);
-                    ctx.lineTo(peg.x - 3, peg.y + 5);
-                    ctx.lineTo(peg.x - 2, peg.y + 1);
-                    ctx.lineTo(peg.x - 5, peg.y - 1.5);
-                    ctx.lineTo(peg.x - 1.5, peg.y - 1.5);
+                    ctx.moveTo(px, py - 5);
+                    ctx.lineTo(px + 1.5, py - 1.5);
+                    ctx.lineTo(px + 5, py - 1.5);
+                    ctx.lineTo(px + 2, py + 1);
+                    ctx.lineTo(px + 3, py + 5);
+                    ctx.lineTo(px, py + 2.5);
+                    ctx.lineTo(px - 3, py + 5);
+                    ctx.lineTo(px - 2, py + 1);
+                    ctx.lineTo(px - 5, py - 1.5);
+                    ctx.lineTo(px - 1.5, py - 1.5);
                     ctx.fill();
                 }
             }
