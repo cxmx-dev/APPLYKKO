@@ -1,0 +1,329 @@
+/* =====================================================
+   APPLYKO - Components (buttons, canvas, quick bets)
+   ===================================================== */
+
+.title-font {
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: -0.04em;
+}
+
+button {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    cursor: pointer;
+    color: #fff;
+}
+
+.quick-bet {
+    padding: 1px 3px;
+    background: #27272a;
+    font-weight: 700;
+    border-radius: 9999px;
+    font-size: 0.62rem;
+}
+
+/* The button directly after the input joins the pill shape */
+.bet-controls button:first-of-type {
+    border-radius: 0 9999px 9999px 0;
+}
+
+.drop-btn {
+    flex: 1;
+    background: var(--accent);
+    color: white;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 2px 4px;
+    border-radius: 9999px;
+}
+
+.auto-btn {
+    padding: 2px 4px;
+    background: #27272a;
+    color: white;
+    font-size: 0.58rem;
+    font-weight: 600;
+    border-radius: 9999px;
+}
+
+.multi-ball-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #1f1f23;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+}
+
+.multi-ball-control label {
+    color: #a1a1aa;
+}
+
+.multi-ball-control input[type="range"] {
+    width: 70px;
+}
+
+#ball-count-value {
+    min-width: 18px;
+    text-align: center;
+    font-weight: 700;
+}
+
+.physics-preset select {
+    background: #1f1f23;
+    color: #ddd;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+}
+
+.endless-toggle {
+    background: #1f1f23;
+    border: 1px solid #3f3f46;
+    color: #ddd;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 0.68rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.endless-toggle:hover {
+    background: #27272a;
+    border-color: #52525b;
+}
+
+.endless-toggle.active {
+    background: #166534;
+    border-color: #4ade80;
+    color: #86efac;
+}
+
+.endless-toggle .status {
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    background: #27272a;
+    font-size: 0.6rem;
+}
+
+.endless-toggle.active .status {
+    background: #15803d;
+    color: #86efac;
+}
+
+.game-canvas {
+    display: block;
+    margin: 0 auto;
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    box-shadow:
+        0 0 0 1px rgba(192, 132, 252, 0.12),
+        0 0 40px rgba(168, 85, 247, 0.18),
+        0 30px 70px -15px rgb(0 0 0 / 0.65);
+    border-radius: 6px;
+    /* CSS size set by maximizeCanvasSize / DeviceProfile.fitCanvas — keep aspect */
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    touch-action: none; /* aim drag on touch */
+}
+
+body.applyko-ready .game-canvas {
+    box-shadow:
+        0 0 0 1px rgba(192, 132, 252, 0.18),
+        0 0 55px rgba(168, 85, 247, 0.28),
+        0 0 120px rgba(96, 165, 250, 0.08),
+        0 30px 70px -15px rgb(0 0 0 / 0.7);
+}
+
+.drop-btn:hover {
+    box-shadow: 0 0 18px rgba(168, 85, 247, 0.55);
+    filter: brightness(1.08);
+}
+
+/* Legacy win animation (kept for compatibility) */
+.win-float {
+    animation: winPop 1.4s ease-out forwards;
+}
+
+@keyframes winPop {
+    0% { transform: scale(0.6) translateY(0); opacity: 0; }
+    20% { transform: scale(1.2) translateY(-12px); opacity: 1; }
+    100% { transform: scale(1) translateY(-55px); opacity: 0; }
+}
+
+/* ==================== CANVAS STAGE + LEGEND (right slide-out) ==================== */
+.canvas-stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    width: 100%;
+}
+
+.canvas-stage .game-canvas {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Wider legend drawer on phone (full-ish side panel) */
+html.device-phone .legend-panel {
+    width: min(320px, 88vw);
+}
+
+/* Legend docks to the right of the canvas stage and slides in/out */
+.legend-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(300px, 42vw);
+    max-width: 100%;
+    background: linear-gradient(180deg, rgba(18, 16, 28, 0.97) 0%, rgba(12, 10, 18, 0.98) 100%);
+    border-left: 1px solid rgba(168, 85, 247, 0.35);
+    padding: 14px 14px 18px;
+    box-sizing: border-box;
+    z-index: 40;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: #e4e4e7;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-shadow: -8px 0 28px rgba(0, 0, 0, 0.55);
+    transform: translateX(105%);
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.legend-panel.is-open {
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+.legend-header {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #c084fc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    letter-spacing: 0.04em;
+    position: sticky;
+    top: 0;
+    background: linear-gradient(180deg, rgba(18, 16, 28, 0.98) 70%, rgba(18, 16, 28, 0) 100%);
+    padding-bottom: 8px;
+    z-index: 1;
+}
+
+.legend-header .key-hint {
+    font-size: 11px;
+    font-weight: 600;
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: #d4d4d8;
+    font-family: ui-monospace, monospace;
+}
+
+.legend-section {
+    margin-bottom: 14px;
+}
+
+.legend-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: #a1a1aa;
+    margin-bottom: 6px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.legend-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-top: 2px;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.legend-key {
+    min-width: 36px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 4px;
+    margin-top: 1px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: ui-monospace, monospace;
+    color: #e9d5ff;
+    background: rgba(39, 39, 42, 0.95);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    box-sizing: border-box;
+}
+
+.legend-text {
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.legend-text strong {
+    color: #fff;
+    font-weight: 600;
+}
+
+.legend-note {
+    margin-top: 10px;
+    font-size: 11px;
+    color: #a1a1aa;
+    border-top: 1px solid #3f3f46;
+    padding-top: 10px;
+    line-height: 1.45;
+}
+
+.legend-note strong {
+    color: #d4d4d8;
+    font-weight: 600;
+}
+
+/* Legend color classes (no inline styles) */
+.legend-color.purple-ball      { background: #c084fc; }
+.legend-color.yellow-mini      { background: #fde047; }
+.legend-color.pink-magnet      { background: #f472b6; }
+.legend-color.yellow-splitter  { background: #fbbf24; }
+.legend-color.green-multiplier { background: #34d399; }
+.legend-color.white-peg        { background: #e4e4e7; }
+.legend-color.wind-arrow {
+    background: linear-gradient(90deg, #60a5fa, #f472b6);
+    border-radius: 3px;
+}
+.legend-color.aim-line {
+    background: #c4b5fd;
+    border-radius: 3px;
+    height: 6px;
+    margin-top: 6px;
+}

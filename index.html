@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#050508">
+
+    <!-- Device profile (phone / tablet / desktop) — before styles so CSS classes exist early -->
+    <script src="device.js"></script>
+
+    <!-- 
+      Ultra-early console filter to kill MetaMask / wallet extension spam
+      before it can pollute the console with red errors.
+      (Placed after charset meta to satisfy linting rules)
+    -->
+    <script>
+      (function() {
+        'use strict';
+        const allowedPrefixes = ['[Main]', '[Engine]', '[Betting]', '[Applyko]', '[Console]', 'Live reload'];
+        const noop = () => {};
+
+        // Immediately nuke the noisy methods
+        console.warn = console.error = console.info = console.debug = noop;
+
+        const originalLog = console.log;
+        console.log = function(...args) {
+          const first = String(args[0] || '');
+          if (allowedPrefixes.some(p => first.includes(p))) {
+            originalLog.apply(console, args);
+          }
+        };
+
+        // Re-apply every 80ms — this catches content scripts that try to restore themselves
+        const reapply = () => {
+          console.warn = console.error = console.info = console.debug = noop;
+        };
+        setInterval(reapply, 80);
+
+        // Also try right after DOM is ready (belt and suspenders)
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', reapply, { once: true });
+        }
+      })();
+    </script>
+
+    <title>APPLYKO v6.3 - Imagine Edition</title>
+
+    <!-- Favicon -->
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+    <!-- CSS (extracted from monolithic version) -->
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <!-- Future: <link rel="stylesheet" href="css/themes.css"> -->
+
+    <style>
+        .file-warning {
+            background: #3f2a1f;
+            color: #fcd34d;
+            padding: 10px 16px;
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 12px;
+            border-radius: 6px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Warning shown only when opened directly via file:// -->
+    <div id="file-warning" class="file-warning">
+        ⚠️ You're opening this via <strong>file://</strong>. ES Modules are blocked by the browser.
+        <strong>Please use a local server</strong> (see README.md) for best results.
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1 class="title-font title">APPLYKO</h1>
+            <div class="header-actions">
+                <button type="button" id="btn-legend" class="legend-open-btn" aria-label="Open legend">Legend</button>
+                <div class="balance">
+                    <div class="balance-label">BALANCE</div>
+                    <div id="balance" class="balance-value">$1,000</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="bet-controls">
+            <label for="bet-input" class="sr-only">Bet amount</label>
+            <input id="bet-input" type="number" value="25" aria-label="Bet amount" title="Bet amount" placeholder="Bet">
+            <button data-bet="10" class="quick-bet">10</button>
+            <button data-bet="25" class="quick-bet">25</button>
+            <button data-bet="50" class="quick-bet">50</button>
+            <button data-bet="100" class="quick-bet">100</button>
+            <button data-bet="250" class="quick-bet">250</button>
+            <button data-bet="500" class="quick-bet">MAX</button>
+        </div>
+
+        <div class="action-row">
+            <button id="drop-btn" class="drop-btn">DROP BALLS</button>
+            <button id="auto-btn" class="auto-btn">AUTO</button>
+            
+            <!-- Multi-ball control -->
+            <div class="multi-ball-control">
+                <label for="ball-count">Balls (3–4 best)</label>
+                <input type="range" id="ball-count" min="1" max="5" step="1" value="4" aria-label="Number of balls to drop">
+                <span id="ball-count-value">4</span>
+            </div>
+
+            <!-- Physics Preset -->
+            <div class="physics-preset">
+                <label for="physics-preset" class="sr-only">Physics preset</label>
+                <select id="physics-preset" aria-label="Physics preset">
+                    <option value="Earth">Earth</option>
+                    <option value="Moon">Moon</option>
+                    <option value="Jupiter">Jupiter</option>
+                    <option value="Zero-G">Zero-G</option>
+                </select>
+            </div>
+
+            <!-- Endless Mode Toggle -->
+            <button id="endless-toggle" class="endless-toggle" title="Toggle Endless / Progressive Mode">
+                <span class="label">ENDLESS</span>
+                <span id="endless-status" class="status">OFF</span>
+            </button>
+        </div>
+
+        <div class="canvas-stage">
+            <canvas id="canvas" width="1720" height="1450" class="game-canvas"></canvas>
+
+            <!-- Legend: slides from right edge of canvas stage; toggle with L -->
+            <aside id="legend-panel" class="legend-panel" aria-hidden="true" aria-label="Game legend and controls">
+                <div class="legend-header">
+                    <span>LEGEND</span>
+                    <span class="key-hint" title="Press L to close">L</span>
+                </div>
+
+                <div class="legend-section">
+                    <div class="legend-title">KEYBOARD</div>
+                    <div class="legend-item">
+                        <div class="legend-key">L</div>
+                        <div class="legend-text">
+                            <strong>Toggle legend</strong><br>
+                            Slide this panel open / closed from the right
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legend-section">
+                    <div class="legend-title">MOUSE / TOUCH / CANVAS</div>
+                    <div class="legend-item">
+                        <div class="legend-key">Drag</div>
+                        <div class="legend-text">
+                            <strong>Aim</strong><br>
+                            Drag left/right on the board (mouse or finger) to bias the next drop
+                        </div>
+                    </div>
+                    <div class="legend-item legend-touch-only">
+                        <div class="legend-key">Tap</div>
+                        <div class="legend-text">
+                            <strong>Legend</strong><br>
+                            Use the <strong>Legend</strong> button (header) — or <strong>L</strong> on a keyboard
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legend-section">
+                    <div class="legend-title">TOP BAR — BETTING</div>
+                    <div class="legend-item">
+                        <div class="legend-key">#</div>
+                        <div class="legend-text">
+                            <strong>Bet amount</strong><br>
+                            Type a custom stake per ball
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-key">10…</div>
+                        <div class="legend-text">
+                            <strong>Quick bets</strong><br>
+                            10 / 25 / 50 / 100 / 250 set stake instantly
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-key">MAX</div>
+                        <div class="legend-text">
+                            <strong>Max bet</strong><br>
+                            Sets stake to ~40% of current balance
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legend-section">
+                    <div class="legend-title">ACTION ROW</div>
+                    <div class="legend-item">
+                        <div class="legend-key">Drop</div>
+                        <div class="legend-text">
+                            <strong>DROP BALLS</strong><br>
+                            Spends bet × ball count and releases balls
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-key">Auto</div>
+                        <div class="legend-text">
+                            <strong>AUTO / STOP</strong><br>
+                            Keeps dropping when few balls are in play
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-key">1–5</div>
+                        <div class="legend-text">
+                            <strong>Ball count slider</strong><br>
+                            Balls per drop. 3–4 runs smoothest
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-key">Phys</div>
+                        <div class="legend-text">
+                            <strong>Physics preset</strong><br>
+                            Earth · Moon · Jupiter · Zero-G (gravity / bounce feel)
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-key">∞</div>
+                        <div class="legend-text">
+                            <strong>ENDLESS</strong><br>
+                            Progressive rows over drops; status shows level when on
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legend-section">
+                    <div class="legend-title">BALLS</div>
+                    <div class="legend-item">
+                        <div class="legend-color purple-ball"></div>
+                        <div class="legend-text">
+                            <strong>Purple ball</strong><br>
+                            Main ball you drop from the top
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color yellow-mini"></div>
+                        <div class="legend-text">
+                            <strong>Yellow mini</strong><br>
+                            Spawned by Splitter pegs · same scoring path
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legend-section">
+                    <div class="legend-title">SPECIAL PEGS</div>
+                    <div class="legend-item">
+                        <div class="legend-color pink-magnet"></div>
+                        <div class="legend-text">
+                            <strong>Pink — Magnet</strong><br>
+                            Pulls the ball toward it on contact
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color yellow-splitter"></div>
+                        <div class="legend-text">
+                            <strong>Yellow — Splitter</strong><br>
+                            Spawns extra mini balls (capped for performance)
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color green-multiplier"></div>
+                        <div class="legend-text">
+                            <strong>Green — Multiplier</strong><br>
+                            Temporary win boost for the sequence
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color white-peg"></div>
+                        <div class="legend-text">
+                            <strong>Chrome peg</strong><br>
+                            Normal bounce only
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legend-section">
+                    <div class="legend-title">BOARD SIGNALS</div>
+                    <div class="legend-item">
+                        <div class="legend-color wind-arrow"></div>
+                        <div class="legend-text">
+                            <strong>Wind arrows</strong><br>
+                            Pink → right bias · Blue → left bias (top of board)
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color aim-line"></div>
+                        <div class="legend-text">
+                            <strong>Aim line</strong><br>
+                            Violet guide while dragging to aim
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legend-note">
+                    Bottom slots pay left→right: <strong>8× · 5× · 2.5× · 1.4× · 0.7× · 0.3× · 0.7× · 1.4× · 2.5× · 5× · 8×</strong>
+                    (edges high, center low). Balance is top-right.
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- 
+        JavaScript Modules (ES Modules)
+        Note: For best compatibility, run with a local server:
+        - VS Code Live Server (recommended)
+        - npx serve .
+        - python -m http.server 8000
+    -->
+    <script type="module" src="js/main.js"></script>
+
+    <script>
+        // Show warning if opened via file://
+        if (location.protocol === 'file:') {
+            const warning = document.getElementById('file-warning');
+            if (warning) warning.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

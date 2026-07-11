@@ -1,0 +1,14 @@
+# Local-only twins (never publish)
+USER-*.md
+USER-*.txt
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.log
+.vscode/*
+!.vscode/settings.json
+
+# Env / secrets
+.env
+.env.*

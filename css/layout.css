@@ -1,0 +1,237 @@
+/* =====================================================
+   APPLYKO - Layout (containers, header, betting row)
+   ===================================================== */
+
+.container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding:
+        max(2px, env(safe-area-inset-top))
+        max(2px, env(safe-area-inset-right))
+        max(2px, env(safe-area-inset-bottom))
+        max(2px, env(safe-area-inset-left));
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0;
+    min-height: 15px;
+    flex-shrink: 0;
+    gap: 8px;
+    padding: 2px 4px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.legend-open-btn {
+    font-family: inherit;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #e9d5ff;
+    background: rgba(88, 28, 135, 0.55);
+    border: 1px solid rgba(192, 132, 252, 0.45);
+    border-radius: 9999px;
+    min-height: 28px;
+    padding: 4px 10px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.legend-open-btn.is-active,
+.legend-open-btn:active {
+    background: rgba(168, 85, 247, 0.45);
+    color: #fff;
+}
+
+.title {
+    font-size: 0.68rem;
+    font-weight: 800;
+    background: linear-gradient(to bottom right, #a855f7, #e0a3f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+    line-height: 1;
+    margin-right: 4px;
+}
+
+.balance {
+    text-align: right;
+}
+
+.balance-label {
+    font-size: 0.55rem;
+    color: var(--muted);
+}
+
+.balance-value {
+    font-family: monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--success);
+}
+
+/* Combined ultra-compact control bar (desktop); wraps + grows on touch/phone */
+.bet-controls {
+    display: flex;
+    gap: 1px;
+    margin: 0;
+    align-items: center;
+    height: 16px;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    padding: 0 2px;
+    box-sizing: border-box;
+}
+
+.bet-input,
+#bet-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9999px 0 0 9999px;
+    padding: 0px;
+    font-family: monospace;
+    font-size: 0.62rem;
+    width: 34px;
+    text-align: center;
+    color: #fff;
+    outline: none;
+}
+
+.bet-input:focus,
+#bet-input:focus {
+    border-color: var(--accent);
+}
+
+.action-row {
+    display: flex;
+    gap: 1px;
+    margin: 0;
+    height: 16px;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    align-items: center;
+    padding: 0 2px;
+    box-sizing: border-box;
+}
+
+/* ---- Phone / tablet / touch: usable targets, wrap chrome, board still flex-fills ---- */
+html.device-phone .header,
+html.device-tablet .header,
+html.input-touch .header {
+    min-height: 36px;
+    padding: 4px 6px;
+}
+
+html.device-phone .title,
+html.device-tablet .title {
+    font-size: 0.85rem;
+}
+
+html.device-phone .balance-value,
+html.device-tablet .balance-value {
+    font-size: 0.85rem;
+}
+
+html.device-phone .legend-open-btn,
+html.device-tablet .legend-open-btn,
+html.input-touch .legend-open-btn {
+    min-height: 40px;
+    min-width: 64px;
+    font-size: 0.72rem;
+    padding: 8px 12px;
+}
+
+html.device-phone .bet-controls,
+html.device-tablet .bet-controls,
+html.input-touch .bet-controls,
+html.device-phone .action-row,
+html.device-tablet .action-row,
+html.input-touch .action-row {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 40px;
+    gap: 4px;
+    padding: 4px 4px;
+}
+
+html.device-phone .bet-controls #bet-input,
+html.device-tablet .bet-controls #bet-input,
+html.input-touch .bet-controls #bet-input {
+    width: 48px;
+    min-height: 40px;
+    font-size: 0.85rem;
+    border-radius: 8px 0 0 8px;
+}
+
+html.device-phone .quick-bet,
+html.device-tablet .quick-bet,
+html.input-touch .quick-bet,
+html.device-phone .drop-btn,
+html.device-tablet .drop-btn,
+html.input-touch .drop-btn,
+html.device-phone .auto-btn,
+html.device-tablet .auto-btn,
+html.input-touch .auto-btn,
+html.device-phone .endless-toggle,
+html.device-tablet .endless-toggle,
+html.input-touch .endless-toggle {
+    min-height: 40px;
+    min-width: 44px;
+    font-size: 0.72rem;
+    padding: 6px 10px;
+}
+
+html.device-phone .multi-ball-control,
+html.device-tablet .multi-ball-control,
+html.input-touch .multi-ball-control {
+    min-height: 40px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+}
+
+html.device-phone .multi-ball-control input[type="range"],
+html.device-tablet .multi-ball-control input[type="range"],
+html.input-touch .multi-ball-control input[type="range"] {
+    width: 90px;
+    min-height: 32px;
+}
+
+html.device-phone .physics-preset select,
+html.device-tablet .physics-preset select,
+html.input-touch .physics-preset select {
+    min-height: 40px;
+    font-size: 0.78rem;
+    padding: 6px 8px;
+}
+
+/* Fine pointer desktop: Legend still available but L is primary */
+html.input-fine.device-desktop .legend-open-btn {
+    opacity: 0.85;
+}
+
+/* Legend mobile-only row */
+.legend-touch-only {
+    display: none;
+}
+html.device-phone .legend-touch-only,
+html.device-tablet .legend-touch-only,
+html.input-touch .legend-touch-only {
+    display: flex;
+}
