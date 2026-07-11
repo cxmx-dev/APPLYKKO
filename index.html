@@ -113,10 +113,24 @@
                 <div class="legend-section">
                     <div class="legend-title">MOUSE / TOUCH / CANVAS</div>
                     <div class="legend-item">
+                        <div class="legend-key">Click / Tap</div>
+                        <div class="legend-text">
+                            <strong>Quick shot</strong><br>
+                            Short click (PC) or tap (mobile) on the playfield drops at default power — same as the old DROP button
+                        </div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-key">Hold</div>
+                        <div class="legend-text">
+                            <strong>Charge shot</strong><br>
+                            Hold left mouse or long-press: 10-segment power meter fills to 100% in 0.5s. Release to launch (power scales launch energy)
+                        </div>
+                    </div>
+                    <div class="legend-item">
                         <div class="legend-key">Drag</div>
                         <div class="legend-text">
                             <strong>Aim</strong><br>
-                            Drag left/right on the board (mouse or finger) to bias the next drop
+                            While holding, drag left/right on the board to bias the shot
                         </div>
                     </div>
                     <div class="legend-item legend-touch-only">
@@ -157,17 +171,10 @@
                 <div class="legend-section">
                     <div class="legend-title">BOTTOM DOCK — PLAY</div>
                     <div class="legend-item">
-                        <div class="legend-key">Drop</div>
-                        <div class="legend-text">
-                            <strong>DROP</strong> (bottom-right)<br>
-                            Spends bet × ball count and releases balls
-                        </div>
-                    </div>
-                    <div class="legend-item">
                         <div class="legend-key">Auto</div>
                         <div class="legend-text">
                             <strong>AUTO / STOP</strong><br>
-                            Keeps dropping when few balls are in play
+                            Keeps dropping when few balls are in play (default power)
                         </div>
                     </div>
                     <div class="legend-item">
@@ -283,7 +290,6 @@
                 </div>
                 <div class="dock-cluster dock-play">
                     <button type="button" id="auto-btn" class="auto-btn">AUTO</button>
-                    <button type="button" id="drop-btn" class="drop-btn">DROP</button>
                 </div>
             </div>
             <div class="dock-row dock-settings">

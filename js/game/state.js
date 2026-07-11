@@ -20,5 +20,10 @@ export const state = {
     currentRows: 15,
 
     // Aiming (set by engine, read by renderer for visual feedback)
-    aimOffset: 0
+    aimOffset: 0,
+
+    /** Playfield charge shot: hold to fill power 0–1 (10 segments, 0.5s to max) */
+    isCharging: false,
+    chargePower: 0,
+    chargeStartMs: 0
 };

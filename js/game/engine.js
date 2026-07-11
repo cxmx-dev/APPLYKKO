@@ -11,6 +11,7 @@ import { state } from './state.js';
 import { initBettingControls, updateBalanceUI, getSelectedBallCount } from '../ui/betting.js';
 import * as Audio from '../audio/audio-manager.js';
 import { loadAssets, assets, buildBoardCache } from './assets.js';
+import { getCurrentPhysics } from './physics-settings.js';
 
 let canvas = null;
 let gameCtx = null;
@@ -23,8 +24,15 @@ let bufferLocked = false;
 let lastCssW = 0;
 let lastCssH = 0;
 
-let dropBtn = null;
 let autoBtn = null;
+
+/** Charge-to-shot: 10 segments, 0.5s to fill max (Newtonian launch scales with power) */
+const CHARGE_MS_TO_MAX = 500;
+const CHARGE_SEGMENTS = 10;
+/** Hold shorter than this = quick tap/click (legacy drop-button feel at default power) */
+const QUICK_SHOT_MS = 140;
+/** Default power matching old DROP button launch (~mid energy) */
+const DEFAULT_SHOT_POWER = 0.52;
 
 /**
  * Fixed steps only (no live shortSide math). Changing canvas.width mid-play
@@ -214,20 +222,26 @@ function updateAutoDrop() {
             state.isAutoDropping = false;
             if (autoBtn) {
                 autoBtn.textContent = "AUTO";
-                autoBtn.style.backgroundColor = "#27272a";
+                autoBtn.style.background = '';
+                autoBtn.style.backgroundColor = '';
             }
         }
     }
 }
 
-export function dropBalls(numBalls = 4) {
-    Audio.initAudioOnUserGesture(); // Ensure audio context is awake
+/**
+ * Launch balls with Newtonian-ish energy scale.
+ * Quick playfield click/tap uses DEFAULT_SHOT_POWER (legacy DROP feel).
+ * Hold-to-charge uses release power 0–1 (10 segments, 0.5s to max).
+ * @param {number} [numBalls] from ball slider when omitted
+ * @param {number} [power=DEFAULT_SHOT_POWER] 0–1 charge; KE scales ~ power², speed ~ power
+ */
+export function dropBalls(numBalls = getSelectedBallCount(), power = DEFAULT_SHOT_POWER) {
+    Audio.initAudioOnUserGesture();
 
-    // Hard cap at 5. 3–4 balls is strongly recommended for performance and clean audio.
     numBalls = Math.max(1, Math.min(5, Math.floor(numBalls)));
     const totalCost = state.bet * numBalls;
 
-    // Reset special peg bonuses at the start of each drop sequence
     delete state._tempMultiplier;
     delete state._chainBonus;
     delete state._chainBonusUntil;
@@ -237,59 +251,65 @@ export function dropBalls(numBalls = 4) {
         return;
     }
 
+    // Clamp power; floor so a soft release still falls under gravity
+    const p = Math.max(0.12, Math.min(1, power));
+    // Speed ∝ power; kinetic energy ∝ power² (heavier feel at high charge)
+    const speedScale = 0.55 + p * 1.15;
+    const energyBoost = 0.85 + p * p * 0.9;
+    const aim = state.aimOffset || 0;
+    // Stronger gravity (Jupiter) needs more initial speed to cover the same drop distance
+    const phys = getCurrentPhysics();
+    const gScale = 1 + Math.max(0, (phys.gravity - 0.165) * 2.4);
+
     state.balance -= totalCost;
 
-    // Progressive / Endless mode progression
     if (state.endlessMode) {
         state.dropsCompleted = (state.dropsCompleted || 0) + 1;
-
         if (state.dropsCompleted % 6 === 0 && (state.currentRows || 15) < 26) {
             state.currentRows = (state.currentRows || 15) + 1;
-            // Rebuild pegs with more rows (now actually works)
             initPegs(state.currentRows);
-
-            // Make multipliers more extreme in endless mode (slower growth)
             if (state.currentRows > 18) {
-                state._multiplierScale = (state.currentRows - 15) * 0.06; // was 0.12
+                state._multiplierScale = (state.currentRows - 15) * 0.06;
             }
-
-            // Note: endless status label in betting UI will reflect on next interaction
-            // (or we can expose a refresh function later)
         }
     }
 
+    // Match old DROP feel near p≈0.52; full charge = harder Newtonian entry
+    const baseVy = (2.35 + p * 3.9) * energyBoost * gScale;
+    const aimKick = aim * (2.1 + p * 3.4) * speedScale;
+    const jitter = (1.1 + p * 1.6) * speedScale;
+
     for (let i = 0; i < numBalls; i++) {
-        const spread = (i - (numBalls - 1) / 2) * 18;
-        const aimInfluence = (state.aimOffset || 0) * 2.8; // horizontal bias from aiming
+        const spread = (i - (numBalls - 1) / 2) * (16 + p * 6);
         state.balls.push({
             x: WIDTH / 2 + spread,
             y: 62,
-            vx: (Math.random() - 0.5) * 1.8 + spread * 0.035 + aimInfluence,
-            vy: 2.8 + Math.random() * 0.9,
-            trail: []
+            vx: (Math.random() - 0.5) * jitter + spread * 0.04 * speedScale + aimKick,
+            vy: baseVy + Math.random() * (0.55 + p * 0.7),
+            trail: [],
+            launchPower: p
         });
     }
 
-    state.aimOffset = 0; // reset after drop
+    state.aimOffset = 0;
+    state.isCharging = false;
+    state.chargePower = 0;
 
-    // Audio - satisfying drop sound (quieter when dropping many balls)
-    const bounceIntensity = numBalls >= 4 ? 3.8 : 5.5;
+    const bounceIntensity = (numBalls >= 4 ? 3.8 : 5.5) * (0.7 + p * 0.55);
     Audio.playBounce(bounceIntensity);
 
-    // Drop burst particles - keep very low when using 4+ balls
-    const particleCount = (numBalls <= 3) ? 8 : 2;
-
+    const particleCount = (numBalls <= 3) ? Math.round(6 + p * 8) : 2;
     for (let i = 0; i < particleCount; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = 1.5 + Math.random() * 2.5;
+        const speed = (1.4 + p * 2.8) + Math.random() * 2;
         state.particles.push({
             x: WIDTH / 2,
             y: 68,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed - 0.8,
             life: 26 + Math.random() * 14,
-            color: '#c084fc',
-            size: 2.5 + Math.random() * 1.8
+            color: p > 0.85 ? '#f0abfc' : '#c084fc',
+            size: 2.2 + Math.random() * (1.5 + p)
         });
     }
 }
@@ -301,7 +321,13 @@ export function toggleAutoDrop() {
 
     if (autoBtn) {
         autoBtn.textContent = state.isAutoDropping ? "STOP" : "AUTO";
-        autoBtn.style.backgroundColor = state.isAutoDropping ? "#10b981" : "#27272a";
+        if (state.isAutoDropping) {
+            autoBtn.style.background = '#10b981';
+            autoBtn.style.backgroundColor = '#10b981';
+        } else {
+            autoBtn.style.background = '';
+            autoBtn.style.backgroundColor = '';
+        }
     }
 
     if (state.isAutoDropping && state.balls.length === 0) {
@@ -311,7 +337,14 @@ export function toggleAutoDrop() {
 
 let _lastBalanceUI = null;
 
+function updateChargePower() {
+    if (!state.isCharging) return;
+    const elapsed = performance.now() - state.chargeStartMs;
+    state.chargePower = Math.max(0, Math.min(1, elapsed / CHARGE_MS_TO_MAX));
+}
+
 function gameLoop() {
+    updateChargePower();
     // Run physics (this also updates particles & floating texts)
     updatePhysics(state, onBallWin, Audio.playPegHit);
     updateBurstFX();
@@ -325,7 +358,6 @@ function gameLoop() {
         updateBalanceUI(state.balance);
     }
 
-    // Always paint (frame-skip caused pegs to strobe on some Android GPUs)
     draw(state);
 
     animationFrame = requestAnimationFrame(gameLoop);
@@ -359,17 +391,8 @@ export async function initGame() {
     // Initialize pegs (stored inside physics module)
     initPegs(state.currentRows || undefined);
 
-    // Cache UI elements
-    dropBtn = document.getElementById('drop-btn');
+    // DROP removed — playfield click/tap/hold charges shot. AUTO remains.
     autoBtn = document.getElementById('auto-btn');
-
-    // Wire core buttons
-    if (dropBtn) {
-        dropBtn.addEventListener('click', () => {
-            const count = getSelectedBallCount();
-            dropBalls(count);
-        });
-    }
     if (autoBtn) {
         autoBtn.addEventListener('click', toggleAutoDrop);
     }
@@ -439,12 +462,18 @@ export async function initGame() {
     console.log('%c[Engine] Applyko modular engine running — all 8 Enhanced Gameplay & Physics features active', 'color:#22c55e;font-weight:600');
 }
 
-export { dropBtn, autoBtn };
+export { autoBtn, CHARGE_MS_TO_MAX, CHARGE_SEGMENTS, QUICK_SHOT_MS, DEFAULT_SHOT_POWER };
 
+/**
+ * Playfield aim + charge-to-shoot (PC mouse + mobile long-press).
+ * - Quick click / tap (< QUICK_SHOT_MS) → same as old DROP (DEFAULT_SHOT_POWER)
+ * - Hold left button / finger: 10-segment meter fills in CHARGE_MS_TO_MAX (0.5s);
+ *   release power = charged fraction (max 100%)
+ * Aim tracks horizontal position the whole time the pointer is down.
+ */
 function setupAiming() {
     if (!canvas) return;
 
-    let isAiming = false;
     let activePointerId = null;
 
     function updateAim(e) {
@@ -455,32 +484,61 @@ function setupAiming() {
         state.aimOffset = Math.max(-1, Math.min(1, delta));
     }
 
-    canvas.addEventListener('pointerdown', (e) => {
-        // Primary button only for mouse; all touches OK
+    function beginCharge(e) {
+        // Primary button only for mouse; all touches / pen OK
         if (e.pointerType === 'mouse' && e.button !== 0) return;
-        isAiming = true;
+        // One finger / button at a time (ignore multi-touch extras)
+        if (activePointerId != null) return;
+
         activePointerId = e.pointerId;
+        const now = performance.now();
+        state.isCharging = true;
+        state.chargeStartMs = now;
+        state.chargePower = 0;
+
         try {
             canvas.setPointerCapture(e.pointerId);
         } catch (err) { /* ignore */ }
+
         updateAim(e);
         e.preventDefault();
-    });
-
-    canvas.addEventListener('pointermove', (e) => {
-        if (!isAiming) return;
-        if (activePointerId != null && e.pointerId !== activePointerId) return;
-        updateAim(e);
-        e.preventDefault();
-    });
-
-    function endAim(e) {
-        if (activePointerId != null && e && e.pointerId !== activePointerId) return;
-        isAiming = false;
-        activePointerId = null;
     }
 
-    canvas.addEventListener('pointerup', endAim);
-    canvas.addEventListener('pointercancel', endAim);
-    canvas.addEventListener('lostpointercapture', endAim);
+    function moveCharge(e) {
+        if (activePointerId == null || e.pointerId !== activePointerId) return;
+        updateAim(e);
+        e.preventDefault();
+    }
+
+    function endCharge(e) {
+        if (activePointerId == null) return;
+        if (e && e.pointerId != null && e.pointerId !== activePointerId) return;
+
+        // Sample final charge before clearing
+        updateChargePower();
+        const elapsed = performance.now() - state.chargeStartMs;
+        const charged = Math.max(0, Math.min(1, state.chargePower));
+
+        activePointerId = null;
+        state.isCharging = false;
+        state.chargePower = 0;
+
+        // Quick tap/click = legacy DROP; hold = release power (Newtonian launch scale)
+        const power = elapsed < QUICK_SHOT_MS
+            ? DEFAULT_SHOT_POWER
+            : Math.max(0.12, charged);
+
+        dropBalls(getSelectedBallCount(), power);
+        if (e) e.preventDefault();
+    }
+
+    canvas.addEventListener('pointerdown', beginCharge);
+    canvas.addEventListener('pointermove', moveCharge);
+    canvas.addEventListener('pointerup', endCharge);
+    canvas.addEventListener('pointercancel', endCharge);
+    canvas.addEventListener('lostpointercapture', (e) => {
+        if (activePointerId != null && e.pointerId === activePointerId) {
+            endCharge(e);
+        }
+    });
 }

@@ -71,6 +71,74 @@ function drawSpriteCentered(sprite, x, y, size, alpha = 1) {
     return true;
 }
 
+/** 10-segment charge meter above the drop zone (0–1 power). */
+function drawPowerMeter(power) {
+    const segments = 10;
+    const filled = Math.max(0, Math.min(segments, Math.floor(power * segments + 1e-6)));
+    // Show partial fill on the next segment for smooth growth within a slot
+    const partial = Math.max(0, Math.min(1, power * segments - filled));
+
+    const meterW = 280;
+    const meterH = 22;
+    const gap = 4;
+    const segW = (meterW - gap * (segments - 1)) / segments;
+    const x0 = (WIDTH - meterW) / 2;
+    const y0 = 28;
+
+    // Track backdrop
+    ctx.fillStyle = 'rgba(24, 24, 27, 0.72)';
+    ctx.beginPath();
+    // rounded-ish rect
+    const padX = 10;
+    const padY = 8;
+    ctx.fillRect(x0 - padX, y0 - padY, meterW + padX * 2, meterH + padY * 2 + 16);
+
+    ctx.fillStyle = 'rgba(228, 228, 231, 0.85)';
+    ctx.font = '600 13px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    const pct = Math.round(Math.max(0, Math.min(1, power)) * 100);
+    ctx.fillText(pct >= 100 ? 'POWER MAX' : `POWER ${pct}%`, WIDTH / 2, y0 - 2);
+
+    for (let i = 0; i < segments; i++) {
+        const sx = x0 + i * (segW + gap);
+        // Empty segment shell
+        ctx.fillStyle = 'rgba(63, 63, 70, 0.95)';
+        ctx.fillRect(sx, y0 + 10, segW, meterH);
+
+        let fillAmt = 0;
+        if (i < filled) fillAmt = 1;
+        else if (i === filled) fillAmt = partial;
+
+        if (fillAmt > 0) {
+            // Cool → hot as power rises
+            const t = (i + fillAmt) / segments;
+            if (t < 0.45) {
+                ctx.fillStyle = `rgba(167, 139, 250, ${0.75 + t * 0.25})`; // violet
+            } else if (t < 0.8) {
+                ctx.fillStyle = `rgba(232, 121, 249, ${0.8 + t * 0.2})`; // fuchsia
+            } else {
+                ctx.fillStyle = `rgba(251, 191, 36, ${0.85 + t * 0.15})`; // gold near max
+            }
+            ctx.fillRect(sx, y0 + 10, segW * fillAmt, meterH);
+
+            // Bright lip on full segments
+            if (fillAmt >= 1) {
+                ctx.fillStyle = 'rgba(255,255,255,0.22)';
+                ctx.fillRect(sx, y0 + 10, segW, 4);
+            }
+        }
+    }
+
+    // Full-charge flash rim
+    if (power >= 0.999) {
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x0 - 4, y0 + 6, meterW + 8, meterH + 8);
+    }
+
+    ctx.textAlign = 'left';
+}
+
 function drawBucketGlass(x, bucketY, bucketW, bucketHeight, color, m, bet) {
     // Flat fill (gradients per bucket every frame is costly)
     ctx.fillStyle = color;
@@ -138,21 +206,30 @@ export function draw(state) {
 
     // Aim bias indicator
     const aim = state.aimOffset || 0;
-    if (Math.abs(aim) > 0.04) {
+    if (Math.abs(aim) > 0.04 || state.isCharging) {
         const aimX = WIDTH / 2 + aim * 95;
-        ctx.strokeStyle = 'rgba(196, 181, 253, 0.55)';
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = state.isCharging
+            ? 'rgba(232, 121, 249, 0.75)'
+            : 'rgba(196, 181, 253, 0.55)';
+        ctx.lineWidth = state.isCharging ? 2.2 : 1.5;
         ctx.beginPath();
         ctx.moveTo(WIDTH / 2, 58);
         ctx.lineTo(aimX, 115);
         ctx.stroke();
 
-        ctx.fillStyle = 'rgba(196, 181, 253, 0.7)';
+        ctx.fillStyle = state.isCharging
+            ? 'rgba(232, 121, 249, 0.9)'
+            : 'rgba(196, 181, 253, 0.7)';
         ctx.beginPath();
         ctx.moveTo(aimX, 115);
         ctx.lineTo(aimX - (aim > 0 ? 5 : -5), 108);
         ctx.lineTo(aimX - (aim > 0 ? 5 : -5), 122);
         ctx.fill();
+    }
+
+    // Charge power meter — 10 segments, fills in ~0.5s to 100%
+    if (state.isCharging) {
+        drawPowerMeter(state.chargePower || 0);
     }
 
     // Bottom multiplier buckets

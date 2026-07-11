@@ -187,37 +187,25 @@
     border-color: rgba(192, 132, 252, 0.5);
 }
 
-/* Primary CTA — largest, rightmost */
-.drop-btn {
-    min-height: 44px;
-    min-width: 96px;
-    padding: 0 18px;
-    background: linear-gradient(135deg, #a855f7 0%, #7c3aed 55%, #6d28d9 100%);
-    color: #fff;
-    font-size: 0.82rem;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    border-radius: 12px;
-    border: 1px solid rgba(233, 213, 255, 0.25);
-    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.45);
-}
-
-.drop-btn:hover,
-.drop-btn:active {
-    filter: brightness(1.08);
-    box-shadow: 0 0 22px rgba(168, 85, 247, 0.55);
-}
-
+/* AUTO — primary play control in dock (shots are playfield click/hold) */
 .auto-btn {
     min-height: 44px;
-    min-width: 64px;
-    padding: 0 14px;
-    background: rgba(39, 39, 42, 0.95);
-    border: 1px solid rgba(63, 63, 70, 0.9);
+    min-width: 72px;
+    padding: 0 16px;
+    background: linear-gradient(135deg, #a855f7 0%, #7c3aed 55%, #6d28d9 100%);
     color: #fff;
-    font-size: 0.72rem;
-    font-weight: 700;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
     border-radius: 12px;
+    border: 1px solid rgba(233, 213, 255, 0.25);
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
+}
+
+.auto-btn:hover,
+.auto-btn:active {
+    filter: brightness(1.08);
+    box-shadow: 0 0 18px rgba(168, 85, 247, 0.5);
 }
 
 .multi-ball-control {
@@ -364,21 +352,15 @@ html.device-phone .dock-play {
     order: 2;
     width: 100%;
     margin-left: 0;
-    justify-content: flex-end; /* DROP stays right */
+    justify-content: flex-end; /* AUTO right-hand zone */
     gap: 10px;
-}
-
-html.device-phone .drop-btn {
-    min-height: 52px;
-    min-width: 42%;
-    font-size: 0.95rem;
-    border-radius: 14px;
 }
 
 html.device-phone .auto-btn {
     min-height: 52px;
-    min-width: 28%;
-    font-size: 0.85rem;
+    min-width: 36%;
+    font-size: 0.9rem;
+    border-radius: 14px;
 }
 
 html.device-phone .quick-bet,
@@ -426,8 +408,8 @@ html.device-desktop.input-fine .control-dock {
     width: 100%;
 }
 
-html.device-desktop.input-fine .drop-btn {
-    min-width: 120px;
+html.device-desktop.input-fine .auto-btn {
+    min-width: 96px;
 }
 
 html.device-desktop.input-fine .legend-open-btn {
