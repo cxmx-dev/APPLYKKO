@@ -32,13 +32,12 @@
           }
         };
 
-        // Re-apply every 80ms — this catches content scripts that try to restore themselves
+        // Rare re-apply (extensions may restore console). Avoid 80ms hammer on mobile CPUs.
         const reapply = () => {
           console.warn = console.error = console.info = console.debug = noop;
         };
-        setInterval(reapply, 80);
+        setInterval(reapply, 4000);
 
-        // Also try right after DOM is ready (belt and suspenders)
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', reapply, { once: true });
         }

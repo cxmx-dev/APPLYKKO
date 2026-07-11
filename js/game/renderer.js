@@ -20,9 +20,15 @@ let ctx = null;
 
 export function initRenderer(canvasContext) {
     ctx = canvasContext;
+    if (!ctx) return;
     ctx.imageSmoothingEnabled = true;
-    // medium is much cheaper than high on 1720×1450
-    ctx.imageSmoothingQuality = 'medium';
+    // low on mobile buffer; medium on desktop
+    const low = window.APPLYKO_PERF && window.APPLYKO_PERF.low;
+    ctx.imageSmoothingQuality = low ? 'low' : 'medium';
+}
+
+function perf() {
+    return window.APPLYKO_PERF || {};
 }
 
 function ensureBoardCache() {
@@ -116,7 +122,8 @@ export function draw(state) {
         ctx.globalAlpha = Math.min(0.9, Math.abs(wind) * 2.1 + 0.15);
 
         const arrowY = 26;
-        for (let i = 0; i < 6; i++) {
+        const arrowCount = perf().windArrows || 6;
+        for (let i = 0; i < arrowCount; i++) {
             const ax = 120 + i * 260 + (Math.sin(t + i) * 8 * dir);
             ctx.beginPath();
             ctx.moveTo(ax - (dir * 12), arrowY);
@@ -241,6 +248,7 @@ export function draw(state) {
     }
 
     // Balls + trails
+    const skipHalos = !!perf().skipHalos;
     for (const b of balls) {
         const trail = b.trail || [];
         if (trail.length > 1) {
@@ -264,13 +272,15 @@ export function draw(state) {
         const ballSprite = b.isMini ? assets.ballMini : assets.ballNormal;
         const spriteSize = br * 2.85;
 
-        // Soft halo without shadowBlur
-        ctx.globalAlpha = 0.28;
-        ctx.fillStyle = b.isMini ? '#fde047' : '#c084fc';
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, br + 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
+        // Soft halo — skip on low-perf mobile
+        if (!skipHalos) {
+            ctx.globalAlpha = 0.28;
+            ctx.fillStyle = b.isMini ? '#fde047' : '#c084fc';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, br + 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
 
         const drew = assets.ready && drawSpriteCentered(ballSprite, b.x, b.y, spriteSize);
 
@@ -299,15 +309,15 @@ export function draw(state) {
     // Soft Imagine jackpot bursts (additive + pre-masked circular stamps)
     if (burstFX.length && assets.ready && assets.burstStamps.length) {
         const prevComp = ctx.globalCompositeOperation;
+        const noRot = !!perf().skipBurstRotate;
         ctx.globalCompositeOperation = 'lighter';
         for (const fx of burstFX) {
             const stamp = assets.burstStamps[fx.stampIndex % assets.burstStamps.length];
             const lifeT = Math.max(0, fx.life / fx.maxLife);
-            // Ease out alpha so the mask edge never hard-cuts at end of life
             const alpha = lifeT * lifeT * 0.9;
             ctx.globalAlpha = alpha;
             const size = fx.size * (1.05 + (1 - lifeT) * 0.35);
-            const rot = fx.rot || 0;
+            const rot = noRot ? 0 : (fx.rot || 0);
             if (rot) {
                 ctx.save();
                 ctx.translate(fx.x, fx.y);

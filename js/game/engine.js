@@ -13,17 +13,81 @@ import * as Audio from '../audio/audio-manager.js';
 import { loadAssets, assets, buildBoardCache } from './assets.js';
 
 let canvas = null;
+let gameCtx = null;
 let animationFrame = null;
+/** Backing-store scale (physics still WIDTH×HEIGHT via setTransform) */
+let renderScale = 1;
+let lowPerf = false;
+let frameSkip = 0;
 
 let dropBtn = null;
 let autoBtn = null;
 
 /**
- * Fit the fixed-resolution board into the canvas-stage (or viewport) on any device.
- * Keeps internal WIDTH×HEIGHT; only CSS size changes so physics stay consistent.
+ * Phone/tablet: draw into a smaller buffer (biggest Android win).
+ * Physics/coordinates stay at WIDTH×HEIGHT via ctx.setTransform.
+ */
+function pickRenderScale() {
+    const dp = window.DeviceProfile && window.DeviceProfile.get
+        ? window.DeviceProfile.get()
+        : null;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const shortSide = Math.min(window.innerWidth || 400, window.innerHeight || 700);
+
+    if (dp && dp.isPhone) {
+        // ~0.38–0.48 of full board pixels
+        return Math.max(0.36, Math.min(0.5, (shortSide * dpr) / WIDTH * 1.15));
+    }
+    if (dp && (dp.isTablet || (dp.isTouch && dp.narrow))) {
+        return 0.58;
+    }
+    if (dp && dp.isTouch) {
+        return 0.72;
+    }
+    // Desktop: full res unless tiny window
+    if (shortSide < 700) return 0.75;
+    return 1;
+}
+
+function applyRenderBuffer(force) {
+    if (!canvas || !gameCtx) return;
+    const next = pickRenderScale();
+    const nextLow = next < 0.72;
+    if (!force && Math.abs(next - renderScale) < 0.02 && nextLow === lowPerf) return;
+
+    renderScale = next;
+    lowPerf = nextLow;
+    window.APPLYKO_PERF = {
+        low: lowPerf,
+        renderScale,
+        maxParticles: lowPerf ? 22 : 48,
+        maxBalls: lowPerf ? 8 : 12,
+        maxBursts: lowPerf ? 2 : 6,
+        trailLen: lowPerf ? 2 : 5,
+        skipHalos: lowPerf,
+        skipBurstRotate: lowPerf,
+        windArrows: lowPerf ? 3 : 6
+    };
+
+    const bw = Math.max(320, Math.floor(WIDTH * renderScale));
+    const bh = Math.max(270, Math.floor(HEIGHT * renderScale));
+    if (canvas.width !== bw || canvas.height !== bh) {
+        canvas.width = bw;
+        canvas.height = bh;
+    }
+    gameCtx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+    gameCtx.imageSmoothingEnabled = true;
+    gameCtx.imageSmoothingQuality = lowPerf ? 'low' : 'medium';
+    initRenderer(gameCtx);
+}
+
+/**
+ * Fit the board into the canvas-stage; also pick mobile render buffer scale.
  */
 function maximizeCanvasSize() {
     if (!canvas) return;
+
+    applyRenderBuffer(false);
 
     const stage = canvas.closest('.canvas-stage') || canvas.parentElement;
     let maxW = window.innerWidth;
@@ -37,6 +101,7 @@ function maximizeCanvasSize() {
     maxW = Math.max(80, maxW - 4);
     maxH = Math.max(80, maxH - 4);
 
+    // CSS size from logical board aspect (not buffer pixels)
     if (window.DeviceProfile && typeof window.DeviceProfile.fitCanvas === 'function') {
         window.DeviceProfile.fitCanvas(canvas, {
             width: WIDTH,
@@ -61,10 +126,12 @@ function spawnBurstFX(x, y, multiplier) {
     if (!assets.ready || !assets.burstStamps.length) return;
     if (!state.burstFX) state.burstFX = [];
 
-    // Cap concurrent bursts for performance
-    if (state.burstFX.length >= 6) return;
+    const maxBursts = (window.APPLYKO_PERF && window.APPLYKO_PERF.maxBursts) || 6;
+    if (state.burstFX.length >= maxBursts) return;
 
-    const count = multiplier >= 8 ? 2 : 1;
+    const count = (window.APPLYKO_PERF && window.APPLYKO_PERF.low)
+        ? 1
+        : (multiplier >= 8 ? 2 : 1);
     for (let i = 0; i < count; i++) {
         const maxLife = 22 + Math.floor(Math.random() * 12);
         state.burstFX.push({
@@ -103,11 +170,12 @@ function onBallWin(x, y, winnings, multiplier) {
         spawnBurstFX(x, y, multiplier);
     }
 
-    // Create particles at landing zone — keep light for high-res boards
+    // Create particles at landing zone — lighter on mobile (APPLYKO_PERF.low)
     const ballCount = state.balls ? state.balls.length : 0;
     let winParticleCount = 8 + Math.floor(multiplier * 0.4);
-
-    if (ballCount >= 3) {
+    if (window.APPLYKO_PERF && window.APPLYKO_PERF.low) {
+        winParticleCount = Math.max(2, Math.floor(winParticleCount * 0.35));
+    } else if (ballCount >= 3) {
         winParticleCount = Math.floor(winParticleCount * 0.45);
     }
 
@@ -259,7 +327,15 @@ function gameLoop() {
         updateBalanceUI(state.balance);
     }
 
-    // Render everything
+    // Mobile: skip every other paint (physics still every frame)
+    if (lowPerf) {
+        frameSkip ^= 1;
+        if (frameSkip) {
+            animationFrame = requestAnimationFrame(gameLoop);
+            return;
+        }
+    }
+
     draw(state);
 
     animationFrame = requestAnimationFrame(gameLoop);
@@ -268,11 +344,13 @@ function gameLoop() {
 export async function initGame() {
     canvas = document.getElementById('canvas');
     // desynchronized + opaque path: less compositor work on large boards
-    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })
+    gameCtx = canvas.getContext('2d', { alpha: false, desynchronized: true })
         || canvas.getContext('2d', { alpha: false })
         || canvas.getContext('2d');
 
-    initRenderer(ctx);
+    // Mobile buffer scale BEFORE first paint (Android: avoid full 1720×1450 every frame)
+    applyRenderBuffer(true);
+    maximizeCanvasSize();
 
     // Imagine dazzle pack (board, sprites, win VFX) — non-blocking fallback if missing
     document.body?.classList.add('applyko-loading');
@@ -305,11 +383,20 @@ export async function initGame() {
     // Initialize betting UI (quick bets + input)
     initBettingControls();
 
+    // Default fewer simultaneous balls on phone (smoother)
+    if (lowPerf) {
+        const ballRange = document.getElementById('ball-count');
+        const ballLabel = document.getElementById('ball-count-value');
+        if (ballRange) {
+            ballRange.value = '3';
+            if (ballLabel) ballLabel.textContent = '3';
+        }
+    }
+
     // Start the game loop
     if (animationFrame) cancelAnimationFrame(animationFrame);
     gameLoop();
 
-    maximizeCanvasSize();
     window.addEventListener('resize', maximizeCanvasSize);
     window.addEventListener('orientationchange', () => {
         setTimeout(maximizeCanvasSize, 80);
@@ -326,9 +413,10 @@ export async function initGame() {
     // Aiming: pointer events (mouse + touch + pen)
     setupAiming();
 
-    // Nice startup visual + optional Imagine burst
+    // Startup VFX — lighter on low-perf devices
     setTimeout(() => {
-        for (let i = 0; i < 22; i++) {
+        const n = (window.APPLYKO_PERF && window.APPLYKO_PERF.low) ? 8 : 22;
+        for (let i = 0; i < n; i++) {
             const angle = Math.random() * Math.PI * 2;
             const speed = 1.8 + Math.random() * 3;
             state.particles.push({
@@ -341,7 +429,9 @@ export async function initGame() {
                 size: 2.5 + Math.random() * 1.5
             });
         }
-        spawnBurstFX(WIDTH / 2, 280, 5);
+        if (!(window.APPLYKO_PERF && window.APPLYKO_PERF.low)) {
+            spawnBurstFX(WIDTH / 2, 280, 5);
+        }
     }, 420);
 
     console.log('%c[Engine] Applyko modular engine running — all 8 Enhanced Gameplay & Physics features active', 'color:#22c55e;font-weight:600');

@@ -19,9 +19,19 @@ let pegs = [];
 let wind = 0;
 let lastWindChange = 0;
 
-// Performance safety caps
+// Performance safety caps (overridden lower on mobile via window.APPLYKO_PERF)
 const MAX_ACTIVE_BALLS = 12;   // including mini-balls from splitters
 const MAX_PARTICLES = 48;      // tighter for 1720×1450 / 2560 displays
+
+function maxActiveBalls() {
+    return (window.APPLYKO_PERF && window.APPLYKO_PERF.maxBalls) || MAX_ACTIVE_BALLS;
+}
+function maxParticles() {
+    return (window.APPLYKO_PERF && window.APPLYKO_PERF.maxParticles) || MAX_PARTICLES;
+}
+function trailLen() {
+    return (window.APPLYKO_PERF && window.APPLYKO_PERF.trailLen) || 5;
+}
 
 function updateWind() {
     const now = Date.now();
@@ -143,7 +153,8 @@ export function updatePhysics(state, onWin, onPegHit = () => {}) {
         // Trail
         b.trail = b.trail || [];
         b.trail.push({ x: b.x, y: b.y });
-        if (b.trail.length > 5) b.trail.shift();
+        const tl = trailLen();
+        while (b.trail.length > tl) b.trail.shift();
 
         // Wall bounces
         const br = b.radius || BALL_RADIUS;
@@ -208,7 +219,7 @@ export function updatePhysics(state, onWin, onPegHit = () => {}) {
                         const cooldown = isMini ? 420 : 260;
                         const canSplit = !peg.lastSplit || (now - peg.lastSplit) > cooldown;
 
-                        if (canSplit && state.balls && state.balls.length < MAX_ACTIVE_BALLS) {
+                        if (canSplit && state.balls && state.balls.length < maxActiveBalls()) {
                             state.balls.push({
                                 x: peg.x,
                                 y: peg.y - 8,
@@ -258,7 +269,7 @@ export function updatePhysics(state, onWin, onPegHit = () => {}) {
                     particleChance = 0.15;
                 }
 
-                if (Math.random() < particleChance && state.particles && state.particles.length < MAX_PARTICLES) {
+                if (Math.random() < particleChance && state.particles && state.particles.length < maxParticles()) {
                     state.particles.push({
                         x: peg.x, y: peg.y,
                         vx: (Math.random() - 0.5) * 2,
@@ -316,8 +327,9 @@ export function updatePhysics(state, onWin, onPegHit = () => {}) {
     }
 
     // --- PARTICLES ---
-    if (particles.length > MAX_PARTICLES) {
-        particles.length = MAX_PARTICLES;
+    const mp = maxParticles();
+    if (particles.length > mp) {
+        particles.length = mp;
     }
 
     for (let i = particles.length - 1; i >= 0; i--) {
