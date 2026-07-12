@@ -41,16 +41,17 @@ First Pages deploy (once): `.\scripts\push-pages.ps1 -Repo APPLYKKO`
 
 ## Controls (short)
 
-Bottom **control dock** on all platforms (primary actions **right** for right-hand thumbs). Slim top bar = title + balance only.
+Bottom **control dock** on all platforms (primary actions **right** for right-hand thumbs). Slim top bar = title + balance only. **No DROP button** — shots are on the playfield.
 
 | Action | How |
 |--------|-----|
-| Aim | Drag left/right on board |
-| Drop | **DROP** (bottom-right, primary) |
-| Auto | **AUTO** / STOP (left of Drop) |
+| Quick shot | **Click** (PC) or **tap** (mobile) playfield — default power (old DROP feel) |
+| Charge shot | **Hold** left mouse / long-press: **10-segment** power meter fills to **100% in 0.5s**; release = launch power |
+| Aim | Drag left/right **while holding** on the board |
+| Auto | **AUTO** / STOP (dock right, purple primary) |
 | Bet | Amount + quick chips (dock left) |
 | Balls | Slider 1–5 (3–4 smoothest) |
-| Physics | Earth / Moon / Jupiter / Zero-G |
+| Physics | Earth / Moon / Jupiter / Zero-G (launch scales with gravity + charge) |
 | Endless | **ENDLESS** toggle |
 | Legend | **Legend** · **L** · mobile: edge swipe **←** open · panel/backdrop swipe **→** or tap dim |
 
@@ -61,6 +62,10 @@ More detail: `NOTES.md`. Machine paths: `USER-NOTES.md` (local only).
 ---
 
 ## Version History
+
+**71226 5:20:36:51 PM CST**
+
+- **`update .mds`:** charge-to-shoot — DROP removed; playfield click/tap = default power; hold 0.5s / 10-segment meter for power launch (Newtonian scale); AUTO dock primary.
 
 **71126 5:47:52:72 AM CST**
 
