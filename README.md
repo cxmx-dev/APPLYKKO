@@ -63,6 +63,10 @@ More detail: `NOTES.md`. Machine paths: `USER-NOTES.md` (local only).
 
 ## Version History
 
+**71226 5:29:25:90 PM CST**
+
+- **`update .mds`:** hub `start-all.ps1` publish sync (`main` **`f5e43b6`**); charge-to-shoot already live on Pages. Live: https://cxmx-dev.github.io/APPLYKKO/
+
 **71226 5:20:36:51 PM CST**
 
 - **`update .mds`:** charge-to-shoot — DROP removed; playfield click/tap = default power; hold 0.5s / 10-segment meter for power launch (Newtonian scale); AUTO dock primary.
