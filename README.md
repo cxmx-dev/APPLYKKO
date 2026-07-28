@@ -63,34 +63,34 @@ More detail: `NOTES.md`. Machine paths: `USER-NOTES.md` (local only).
 
 ## Version History
 
-**71226 5:29:25:90 PM CST**
+**2026-07-12**
 
 - **`update .mds`:** hub `start-all.ps1` publish sync (`main` **`f5e43b6`**); charge-to-shoot already live on Pages. Live: https://cxmx-dev.github.io/APPLYKKO/
 
-**71226 5:20:36:51 PM CST**
+**2026-07-12**
 
 - **`update .mds`:** charge-to-shoot — DROP removed; playfield click/tap = default power; hold 0.5s / 10-segment meter for power launch (Newtonian scale); AUTO dock primary.
 
-**71126 5:47:52:72 AM CST**
+**2026-07-11**
 
 - **`update .mds`:** public README OPSEC scrub (no hub folder name in publish set); privacy scan clean path. Live deploy via hub `start.ps1 -Repo APPLYKKO`.
 
-**71126 5:39:23:15 AM CST**
+**2026-07-11**
 
 - **`update .mds`:** mobile legend gestures rebuilt — right-edge strip + pointer capture for open; backdrop + panel swipe-right/tap for close (document-level swipes were unreliable over canvas aim).
 
-**71126 5:31:12:66 AM CST**
+**2026-07-11**
 
 - **`update .mds`:** Android peg **strobe fix** — lock render buffer (no thrash on URL bar); remove frame-skip; full-alpha snapped pegs; no `desynchronized` on touch. Mobile still uses 0.45 buffer + light VFX.
 
-**71126 5:25:47:82 AM CST**
+**2026-07-11**
 
 - **`update .mds`:** mobile perf pass documented (render scale, half paint, VFX caps); live Pages; README restored (ensure-publish no longer clobbers full README).
 
-**71126 5:03:05:48 AM CST**
+**2026-07-11**
 
 - Device-aware ship; hub-wired static Pages; first deploy path.
 
-**71126 4:51:44:95 AM CST**
+**2026-07-11**
 
 - Controls table + right-edge legend (**L**).
