@@ -73,10 +73,6 @@ More detail: `NOTES.md`. Machine paths: `USER-NOTES.md` (local only).
 
 **2026-07-11**
 
-- **`update .mds`:** public README OPSEC scrub (no hub folder name in publish set); privacy scan clean path. Live deploy via hub `start.ps1 -Repo APPLYKKO`.
-
-**2026-07-11**
-
 - **`update .mds`:** mobile legend gestures rebuilt — right-edge strip + pointer capture for open; backdrop + panel swipe-right/tap for close (document-level swipes were unreliable over canvas aim).
 
 **2026-07-11**
