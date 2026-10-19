@@ -1,0 +1,442 @@
+/**
+ * APPLYKO - Rendering System
+ * Owns all Canvas drawing:
+ *  - Cached Imagine board background
+ *  - Multiplier buckets
+ *  - Pegs (sprite + procedural fallback)
+ *  - Balls + trails (sprite + fallback)
+ *  - Particles + soft jackpot burst stamps
+ *  - Floating win text
+ *
+ * Perf notes: avoid ctx.shadowBlur (very expensive on large canvases);
+ * board is pre-composited once in assets.boardCache.
+ */
+
+import { WIDTH, HEIGHT, PEG_RADIUS, BALL_RADIUS, multipliers } from '../config.js';
+import { pegs, wind } from './physics.js';
+import { assets, pegSpriteForType, buildBoardCache } from './assets.js';
+
+let ctx = null;
+
+export function initRenderer(canvasContext) {
+    ctx = canvasContext;
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = true;
+    // low on mobile buffer; medium on desktop
+    const low = window.APPLYKO_PERF && window.APPLYKO_PERF.low;
+    ctx.imageSmoothingQuality = low ? 'low' : 'medium';
+}
+
+function perf() {
+    return window.APPLYKO_PERF || {};
+}
+
+function ensureBoardCache() {
+    if (!assets.boardCache && assets.boardBg) {
+        buildBoardCache(WIDTH, HEIGHT);
+    }
+}
+
+function drawBoardBackground() {
+    ensureBoardCache();
+
+    if (assets.boardCache) {
+        ctx.drawImage(assets.boardCache, 0, 0);
+        // Cheap neon lip (no full-frame gradients every frame)
+        ctx.fillStyle = 'rgba(168, 85, 247, 0.12)';
+        ctx.fillRect(0, 0, WIDTH, 6);
+        ctx.fillStyle = 'rgba(96, 165, 250, 0.08)';
+        ctx.fillRect(0, HEIGHT - 6, WIDTH, 6);
+        return;
+    }
+
+    // Procedural fallback
+    const grad = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+    grad.addColorStop(0, '#111113');
+    grad.addColorStop(1, '#0a0a0b');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+}
+
+function drawSpriteCentered(sprite, x, y, size, alpha = 1) {
+    if (!sprite) return false;
+    if (alpha < 1) {
+        const prev = ctx.globalAlpha;
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(sprite, x - size / 2, y - size / 2, size, size);
+        ctx.globalAlpha = prev;
+    } else {
+        ctx.drawImage(sprite, x - size / 2, y - size / 2, size, size);
+    }
+    return true;
+}
+
+/** 10-segment charge meter above the drop zone (0–1 power). */
+function drawPowerMeter(power) {
+    const segments = 10;
+    const filled = Math.max(0, Math.min(segments, Math.floor(power * segments + 1e-6)));
+    // Show partial fill on the next segment for smooth growth within a slot
+    const partial = Math.max(0, Math.min(1, power * segments - filled));
+
+    const meterW = 280;
+    const meterH = 22;
+    const gap = 4;
+    const segW = (meterW - gap * (segments - 1)) / segments;
+    const x0 = (WIDTH - meterW) / 2;
+    const y0 = 28;
+
+    // Track backdrop
+    ctx.fillStyle = 'rgba(24, 24, 27, 0.72)';
+    ctx.beginPath();
+    // rounded-ish rect
+    const padX = 10;
+    const padY = 8;
+    ctx.fillRect(x0 - padX, y0 - padY, meterW + padX * 2, meterH + padY * 2 + 16);
+
+    ctx.fillStyle = 'rgba(228, 228, 231, 0.85)';
+    ctx.font = '600 13px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    const pct = Math.round(Math.max(0, Math.min(1, power)) * 100);
+    ctx.fillText(pct >= 100 ? 'POWER MAX' : `POWER ${pct}%`, WIDTH / 2, y0 - 2);
+
+    for (let i = 0; i < segments; i++) {
+        const sx = x0 + i * (segW + gap);
+        // Empty segment shell
+        ctx.fillStyle = 'rgba(63, 63, 70, 0.95)';
+        ctx.fillRect(sx, y0 + 10, segW, meterH);
+
+        let fillAmt = 0;
+        if (i < filled) fillAmt = 1;
+        else if (i === filled) fillAmt = partial;
+
+        if (fillAmt > 0) {
+            // Cool → hot as power rises
+            const t = (i + fillAmt) / segments;
+            if (t < 0.45) {
+                ctx.fillStyle = `rgba(167, 139, 250, ${0.75 + t * 0.25})`; // violet
+            } else if (t < 0.8) {
+                ctx.fillStyle = `rgba(232, 121, 249, ${0.8 + t * 0.2})`; // fuchsia
+            } else {
+                ctx.fillStyle = `rgba(251, 191, 36, ${0.85 + t * 0.15})`; // gold near max
+            }
+            ctx.fillRect(sx, y0 + 10, segW * fillAmt, meterH);
+
+            // Bright lip on full segments
+            if (fillAmt >= 1) {
+                ctx.fillStyle = 'rgba(255,255,255,0.22)';
+                ctx.fillRect(sx, y0 + 10, segW, 4);
+            }
+        }
+    }
+
+    // Full-charge flash rim
+    if (power >= 0.999) {
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x0 - 4, y0 + 6, meterW + 8, meterH + 8);
+    }
+
+    ctx.textAlign = 'left';
+}
+
+function drawBucketGlass(x, bucketY, bucketW, bucketHeight, color, m, bet) {
+    // Flat fill (gradients per bucket every frame is costly)
+    ctx.fillStyle = color;
+    ctx.fillRect(x, bucketY, bucketW - 1, bucketHeight);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    ctx.fillRect(x + 2, bucketY + 2, bucketW - 5, 8);
+
+    if (m >= 5) {
+        ctx.strokeStyle = m >= 8 ? 'rgba(134, 239, 172, 0.5)' : 'rgba(253, 224, 71, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x + 4, bucketY + 1);
+        ctx.lineTo(x + bucketW - 5, bucketY + 1);
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = (m >= 8) ? '#86efac' : (m >= 1.8 ? '#fde047' : '#d1d5db');
+    ctx.font = '600 24px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${m}×`, x + bucketW / 2, bucketY + 42);
+
+    ctx.font = '500 15px Inter, system-ui, sans-serif';
+    ctx.fillStyle = '#a1a1aa';
+    ctx.fillText(`$${Math.floor((bet || 25) * m)}`, x + bucketW / 2, bucketY + 65);
+}
+
+export function draw(state) {
+    if (!ctx) return;
+
+    const { balls = [], particles = [], floatingTexts = [], burstFX = [] } = state;
+    // Date.now() must match physics (peg.activatedUntil); performance.now() only for cheap animation phase
+    const now = Date.now();
+    const animT = performance.now();
+
+    // Opaque clear — faster than clearRect + transparent composite on large boards
+    ctx.fillStyle = '#050508';
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    drawBoardBackground();
+
+    // === Wind Arrows (top) - animated ===
+    if (Math.abs(wind) > 0.015) {
+        const t = animT / 180;
+        const dir = wind > 0 ? 1 : -1;
+        const strength = Math.min(Math.abs(wind) * 42, 62);
+
+        ctx.strokeStyle = dir > 0 ? '#f472b6' : '#60a5fa';
+        ctx.lineWidth = 2.2;
+        ctx.globalAlpha = Math.min(0.9, Math.abs(wind) * 2.1 + 0.15);
+
+        const arrowY = 26;
+        const arrowCount = perf().windArrows || 6;
+        for (let i = 0; i < arrowCount; i++) {
+            const ax = 120 + i * 260 + (Math.sin(t + i) * 8 * dir);
+            ctx.beginPath();
+            ctx.moveTo(ax - (dir * 12), arrowY);
+            ctx.lineTo(ax + (dir * strength), arrowY);
+            ctx.lineTo(ax + (dir * (strength - 10)), arrowY - 4);
+            ctx.moveTo(ax + (dir * strength), arrowY);
+            ctx.lineTo(ax + (dir * (strength - 10)), arrowY + 4);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // Aim bias indicator
+    const aim = state.aimOffset || 0;
+    if (Math.abs(aim) > 0.04 || state.isCharging) {
+        const aimX = WIDTH / 2 + aim * 95;
+        ctx.strokeStyle = state.isCharging
+            ? 'rgba(232, 121, 249, 0.75)'
+            : 'rgba(196, 181, 253, 0.55)';
+        ctx.lineWidth = state.isCharging ? 2.2 : 1.5;
+        ctx.beginPath();
+        ctx.moveTo(WIDTH / 2, 58);
+        ctx.lineTo(aimX, 115);
+        ctx.stroke();
+
+        ctx.fillStyle = state.isCharging
+            ? 'rgba(232, 121, 249, 0.9)'
+            : 'rgba(196, 181, 253, 0.7)';
+        ctx.beginPath();
+        ctx.moveTo(aimX, 115);
+        ctx.lineTo(aimX - (aim > 0 ? 5 : -5), 108);
+        ctx.lineTo(aimX - (aim > 0 ? 5 : -5), 122);
+        ctx.fill();
+    }
+
+    // Charge power meter — 10 segments, fills in ~0.5s to 100%
+    if (state.isCharging) {
+        drawPowerMeter(state.chargePower || 0);
+    }
+
+    // Bottom multiplier buckets
+    const bucketHeight = 115;
+    const bucketY = HEIGHT - bucketHeight;
+    const bucketW = WIDTH / multipliers.length;
+
+    for (let i = 0; i < multipliers.length; i++) {
+        const x = i * bucketW;
+        const m = multipliers[i];
+
+        let color = '#3f3f46';
+        if (m >= 8) color = '#14532d';
+        else if (m >= 3) color = '#713f12';
+        else if (m >= 1.8) color = '#3f3f46';
+        else color = '#27272a';
+
+        drawBucketGlass(x, bucketY, bucketW, bucketHeight, color, m, state.bet);
+    }
+
+    // Pegs — no shadowBlur (major GPU cost on 1720×1450)
+    const snapPegs = !!perf().snapPegs;
+    for (const peg of pegs) {
+        let color = '#e4e4e7';
+        let size = PEG_RADIUS;
+        let glow = false;
+        let drawExtra = null;
+        let spriteSize = PEG_RADIUS * 2.6;
+
+        if (peg.activatedUntil && now < peg.activatedUntil) {
+            glow = true;
+            color = peg.glowColor || '#a5b4fc';
+            size = PEG_RADIUS * 1.2;
+            spriteSize = PEG_RADIUS * 3.4;
+        } else if (peg.type === 'magnet') {
+            color = '#f472b6';
+            drawExtra = 'magnet';
+            spriteSize = PEG_RADIUS * 4.2;
+        } else if (peg.type === 'splitter') {
+            color = '#fbbf24';
+            drawExtra = 'splitter';
+            spriteSize = PEG_RADIUS * 4.2;
+        } else if (peg.type === 'multiplier') {
+            color = '#34d399';
+            drawExtra = 'multiplier';
+            spriteSize = PEG_RADIUS * 4.2;
+        }
+
+        const sprite = pegSpriteForType(peg.type);
+        // Integer positions on mobile reduce subpixel shimmer/strobe
+        const px = snapPegs ? Math.round(peg.x) : peg.x;
+        const py = snapPegs ? Math.round(peg.y) : peg.y;
+        if (snapPegs) spriteSize = Math.round(spriteSize);
+
+        // Activated hit flash only (no per-frame alpha flicker on idle pegs)
+        if (glow) {
+            ctx.globalAlpha = 0.35;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(px, py, size + 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+
+        // Always alpha 1 — 0.95 idle alpha + low-res scale was shimmering on Android
+        const drew = drawSpriteCentered(sprite, px, py, spriteSize, 1);
+        if (!drew) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(px, py, size, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (drawExtra) {
+                ctx.fillStyle = '#fff';
+                if (drawExtra === 'magnet') {
+                    ctx.fillRect(px - 1.5, py - 7, 3, 14);
+                    ctx.fillRect(px - 4, py - 4, 8, 3);
+                }
+                if (drawExtra === 'splitter') {
+                    ctx.fillRect(px - 4, py - 1, 8, 2);
+                    ctx.fillRect(px - 1, py - 4, 2, 8);
+                }
+                if (drawExtra === 'multiplier') {
+                    ctx.beginPath();
+                    ctx.moveTo(px, py - 5);
+                    ctx.lineTo(px + 1.5, py - 1.5);
+                    ctx.lineTo(px + 5, py - 1.5);
+                    ctx.lineTo(px + 2, py + 1);
+                    ctx.lineTo(px + 3, py + 5);
+                    ctx.lineTo(px, py + 2.5);
+                    ctx.lineTo(px - 3, py + 5);
+                    ctx.lineTo(px - 2, py + 1);
+                    ctx.lineTo(px - 5, py - 1.5);
+                    ctx.lineTo(px - 1.5, py - 1.5);
+                    ctx.fill();
+                }
+            }
+        }
+    }
+
+    // Balls + trails
+    const skipHalos = !!perf().skipHalos;
+    for (const b of balls) {
+        const trail = b.trail || [];
+        if (trail.length > 1) {
+            const trailColor = b.isMini
+                ? 'rgba(253, 224, 71, 0.38)'
+                : 'rgba(192, 132, 252, 0.4)';
+            ctx.strokeStyle = trailColor;
+            ctx.lineWidth = b.isMini ? 2.4 : 3.4;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            for (let t = 0; t < trail.length; t++) {
+                const p = trail[t];
+                if (t === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+        }
+
+        const br = b.radius || BALL_RADIUS;
+        const ballSprite = b.isMini ? assets.ballMini : assets.ballNormal;
+        const spriteSize = br * 2.85;
+
+        // Soft halo — skip on low-perf mobile
+        if (!skipHalos) {
+            ctx.globalAlpha = 0.28;
+            ctx.fillStyle = b.isMini ? '#fde047' : '#c084fc';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, br + 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+
+        const drew = assets.ready && drawSpriteCentered(ballSprite, b.x, b.y, spriteSize);
+
+        if (!drew) {
+            ctx.fillStyle = b.isMini ? '#fde047' : '#c084fc';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, br, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.45)';
+            ctx.beginPath();
+            ctx.arc(b.x - 3.5, b.y - 3.5, br * 0.38, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Particles (batch color changes loosely)
+    for (const p of particles) {
+        ctx.globalAlpha = Math.max(0.12, p.life / 45);
+        ctx.fillStyle = p.color || '#a1a1aa';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size || 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Soft Imagine jackpot bursts (additive + pre-masked circular stamps)
+    if (burstFX.length && assets.ready && assets.burstStamps.length) {
+        const prevComp = ctx.globalCompositeOperation;
+        const noRot = !!perf().skipBurstRotate;
+        ctx.globalCompositeOperation = 'lighter';
+        for (const fx of burstFX) {
+            const stamp = assets.burstStamps[fx.stampIndex % assets.burstStamps.length];
+            const lifeT = Math.max(0, fx.life / fx.maxLife);
+            const alpha = lifeT * lifeT * 0.9;
+            ctx.globalAlpha = alpha;
+            const size = fx.size * (1.05 + (1 - lifeT) * 0.35);
+            const rot = noRot ? 0 : (fx.rot || 0);
+            if (rot) {
+                ctx.save();
+                ctx.translate(fx.x, fx.y);
+                ctx.rotate(rot);
+                ctx.drawImage(stamp, -size / 2, -size / 2, size, size);
+                ctx.restore();
+            } else {
+                ctx.drawImage(stamp, fx.x - size / 2, fx.y - size / 2, size, size);
+            }
+        }
+        ctx.globalCompositeOperation = prevComp;
+        ctx.globalAlpha = 1;
+    }
+
+    // Floating win texts — no shadowBlur
+    ctx.textAlign = 'center';
+    for (const t of floatingTexts) {
+        ctx.globalAlpha = t.alpha ?? 1;
+        ctx.fillStyle = t.color || '#fff';
+
+        let displayText = t.text;
+        const match = t.text.match(/^\+\$?([\d.]+)/);
+        if (match) {
+            const num = parseFloat(match[1]);
+            if (num >= 1_000_000_000) {
+                displayText = `+$${(num / 1_000_000_000).toFixed(2)}B`;
+            } else if (num >= 1_000_000) {
+                displayText = `+$${(num / 1_000_000).toFixed(1)}M`;
+            } else if (num >= 10_000) {
+                displayText = `+$${(num / 1000).toFixed(0)}k`;
+            }
+        }
+
+        ctx.font = '700 32px Inter, system-ui, sans-serif';
+        ctx.fillText(displayText, t.x, t.y);
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
+}
